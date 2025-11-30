@@ -1,0 +1,79 @@
+# Node.js
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Next.js
+.next/
+out/
+
+# Environment files
+.env*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Scripts
+scripts/
+
+# Docker
+docker-compose*.yml
+Dockerfile
+docker/
+
+# Uploads and temporary files
+uploads/
+temp/
+.tmp/
+
+# Test files
+__tests__/
+*.test.js
+*.test.py
+coverage/
+
+# Build artifacts
+build/
+dist/

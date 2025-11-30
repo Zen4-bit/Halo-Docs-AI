@@ -1,0 +1,60 @@
+{
+  "name": "halo-docs-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Next-generation enterprise-grade AI document platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "start-halo": "powershell -ExecutionPolicy Bypass -File ./scripts/start-halo.ps1",
+    "start-halo-docker": "powershell -ExecutionPolicy Bypass -File ./scripts/start-halo.ps1 -Docker",
+    "start-simple": "powershell -ExecutionPolicy Bypass -File ./scripts/start-simple.ps1",
+    "monitor": "powershell -ExecutionPolicy Bypass -File ./scripts/health-monitor.ps1 -AutoRestart",
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:web": "npm run dev --workspace=apps/web",
+    "dev:api": "cd apps/api && uvicorn main:app --reload --host 0.0.0.0 --port 8080",
+    "build": "npm run build --workspaces",
+    "build:web": "npm run build --workspace=apps/web",
+    "build:api": "echo 'API build handled by Docker'",
+    "lint": "npm run lint --workspaces",
+    "lint:fix": "npm run lint:fix --workspaces",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md,css,scss}\"",
+    "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,md,css,scss}\"",
+    "test": "npm run test --workspaces",
+    "test:watch": "npm run test:watch --workspaces",
+    "test:coverage": "npm run test:coverage --workspaces",
+    "type-check": "npm run type-check --workspaces",
+    "clean": "npm run clean --workspaces && rm -rf node_modules",
+    "docker:setup": "powershell -ExecutionPolicy Bypass -File ./scripts/docker-setup.ps1",
+    "docker:up": "docker compose up --build -d",
+    "docker:down": "docker compose down",
+    "docker:logs": "powershell -ExecutionPolicy Bypass -File ./scripts/docker-logs.ps1",
+    "docker:restart": "docker compose restart",
+    "docker:clean": "docker compose down -v && docker system prune -f",
+    "docker:prod": "docker compose -f docker-compose.prod.yml up --build -d",
+    "docker:prod:down": "docker compose -f docker-compose.prod.yml down",
+    "setup": "npm install && npm run build",
+    "start": "npm run start --workspace=apps/web",
+    "prepare": "echo 'Project ready'"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.13.1",
+    "@typescript-eslint/parser": "^6.13.1",
+    "concurrently": "^8.2.2",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "prettier": "^3.1.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "dependencies": {
+    "esbuild": "^0.27.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

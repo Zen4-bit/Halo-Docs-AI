@@ -1,0 +1,76 @@
+# ===========================================
+# HALO Docs AI - Development Docker Compose
+# ===========================================
+# Usage: docker compose up -d
+# For production, use: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: halo-docs-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-halo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-halo}
+      POSTGRES_DB: ${POSTGRES_DB:-halodocs}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-halo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - halo-network
+
+  # Redis Cache & Queue
+  redis:
+    image: redis:7-alpine
+    container_name: halo-docs-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - halo-network
+
+  # Next.js Frontend (Development)
+  frontend:
+    image: nikolaik/python-nodejs:python3.12-nodejs20
+    container_name: halo-frontend
+    working_dir: /app
+    command: bash -c "cd /app/apps/web && npm install --legacy-peer-deps --no-audit --no-fund && npm run dev"
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/apps/web/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - VERTEX_AI_API_KEY=${VERTEX_AI_API_KEY}
+      - NEXT_PUBLIC_API_BASE=http://host.docker.internal:8080/api/v1
+      - NODE_ENV=development
+    restart: unless-stopped
+    networks:
+      - halo-network
+
+volumes:
+  postgres_data:
+    name: halo-postgres-data
+  redis_data:
+    name: halo-redis-data
+
+networks:
+  halo-network:
+    driver: bridge
+    name: halo-docs-network

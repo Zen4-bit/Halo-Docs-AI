@@ -1,0 +1,142 @@
+# ================================
+# HALO Docs AI - .gitignore
+# ================================
+
+# ============ Dependencies ============
+node_modules/
+.pnp/
+.pnp.js
+.yarn/install-state.gz
+
+# ============ Build Output ============
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# ============ Python ============
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ============ Environment ============
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.env
+
+# ============ IDE & Editor ============
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.settings/
+*.sublime-workspace
+*.sublime-project
+
+# ============ OS Files ============
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ============ Logs ============
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ============ Testing ============
+coverage/
+.nyc_output/
+*.lcov
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+nosetests.xml
+coverage.xml
+
+# ============ Temporary Files ============
+temp/
+tmp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.swp
+*.old
+
+# ============ Database ============
+*.db
+*.sqlite
+*.sqlite3
+
+# ============ Uploads & Generated ============
+uploads/
+storage/
+*.pdf
+!apps/web/public/*.pdf
+
+# ============ Docker ============
+.docker/
+
+# ============ Debug & Error Files ============
+tsc-errors*.txt
+build_log*.txt
+type_check.log
+
+# ============ Package Locks (optional) ============
+# Uncomment if you want to ignore lock files
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ============ Misc ============
+*.pem
+.vercel
+.turbo
+.cache/
+
+# ============ API Keys & Secrets (CRITICAL) ============
+# NEVER commit these files
+*.key
+*credentials*
+*.credentials
+service-account*.json
+google-credentials*.json
+.gcp/
+secrets/
+.secrets/
+api-keys/
+.api-keys/
+
+# ============ Docker Local Files ============
+# Keep templates, ignore actual env files
+!.env.example
+!.env.docker.template
+!.env.local.template

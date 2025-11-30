@@ -1,0 +1,45 @@
+# Cloud Build configuration for HALO AI Backend
+# Builds and deploys FastAPI backend to Cloud Run
+
+steps:
+  # Build the backend container image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-f', 'cloud-run/Dockerfile.backend', '-t', 'gcr.io/$PROJECT_ID/halo-ai-backend:$BUILD_ID', '.']
+    id: 'build-backend'
+
+  # Push the container image to Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/halo-ai-backend:$BUILD_ID']
+    id: 'push-backend'
+    waitFor: ['build-backend']
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'halo-ai-backend'
+      - '--image=gcr.io/$PROJECT_ID/halo-ai-backend:$BUILD_ID'
+      - '--region=us-central1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--memory=2Gi'
+      - '--cpu=1'
+      - '--timeout=300s'
+      - '--min-instances=0'
+      - '--max-instances=10'
+      - '--set-env-vars=VERTEX_AI_PROJECT_ID=$PROJECT_ID'
+      - '--set-env-vars=VERTEX_AI_LOCATION=us-central1'
+      - '--set-env-vars=PYTHON_ENV=production'
+    id: 'deploy-backend'
+    waitFor: ['push-backend']
+
+# Store the backend URL for frontend deployment
+options:
+  logging: CLOUD_LOGGING_ONLY
+  diskSizeGb: 100
+
+substitutions:
+  _REGION: 'us-central1'
+
+tags: ['halo-ai-backend']

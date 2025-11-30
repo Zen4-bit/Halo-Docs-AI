@@ -1,0 +1,56 @@
+# HALO AI Platform - Backend for Google Cloud Run
+# Production-optimized FastAPI backend with Vertex AI integration
+
+FROM python:3.12-slim
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONPATH=/app
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    curl \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy and install Python dependencies
+COPY apps/api/requirements.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && rm -rf /root/.cache/pip
+
+# Copy application code
+COPY apps/api/ .
+
+# Create necessary directories
+RUN mkdir -p /app/uploads
+
+# Health check
+RUN echo '#!/bin/bash\ncurl -f http://localhost:8080/health || exit 1' > /app/healthcheck.sh \
+    && chmod +x /app/healthcheck.sh
+
+# Cloud Run environment variables
+ENV API_PORT=8080 \
+    PYTHON_ENV=production \
+    USE_LOCAL_STORAGE=true \
+    LOCAL_STORAGE_PATH=/app/uploads \
+    VERTEX_AI_PROJECT_ID="imposing-grail-476206-j6" \
+    VERTEX_AI_LOCATION="us-central1" \
+    VERTEX_AI_ENDPOINT="https://aiplatform.googleapis.com/v1/publishers/google/models" \
+    VERTEX_AI_GEMINI_MODEL="gemini-2.0-flash-exp" \
+    VERTEX_AI_IMAGEN_MODEL="imagen-3.0-generate-001" \
+    VERTEX_AI_VIDEO_MODEL="veo-3.1-generate-preview"
+
+# Expose port for Cloud Run
+EXPOSE 8080
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD /app/healthcheck.sh
+
+# Run FastAPI with production settings
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]

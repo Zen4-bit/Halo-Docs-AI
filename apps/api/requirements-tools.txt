@@ -1,0 +1,112 @@
+# HALO Docs AI - Tools Backend Requirements
+# Python 3.9+
+
+# ============================================================
+# CORE FRAMEWORK
+# ============================================================
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# ============================================================
+# PDF PROCESSING
+# ============================================================
+PyPDF2==3.0.1
+pypdf==3.17.1
+pikepdf==8.7.1
+pdf2image==1.16.3
+img2pdf==0.5.1
+
+# PDF conversion dependencies (requires system packages)
+# Install Ghostscript: https://www.ghostscript.com/
+# Install Poppler: https://poppler.freedesktop.org/
+
+# ============================================================
+# IMAGE PROCESSING
+# ============================================================
+Pillow==10.1.0
+pillow-heif==0.13.1
+
+# Sharp alternative for Python (optional, for better performance)
+# pyvips==2.2.1  # Uncomment if you want faster image processing
+
+# ============================================================
+# OFFICE DOCUMENT PROCESSING
+# ============================================================
+# Requires LibreOffice to be installed
+# Windows: https://www.libreoffice.org/download/download/
+# Linux: sudo apt-get install libreoffice
+# Mac: brew install libreoffice
+
+# For PDF to Excel conversion
+tabula-py==2.9.0
+pandas==2.1.3
+openpyxl==3.1.2
+
+# ============================================================
+# VIDEO PROCESSING
+# ============================================================
+yt-dlp==2023.11.16
+
+# FFmpeg required for video conversion
+# Windows: https://ffmpeg.org/download.html
+# Linux: sudo apt-get install ffmpeg
+# Mac: brew install ffmpeg
+
+# ============================================================
+# FILE VALIDATION
+# ============================================================
+python-magic==0.4.27
+python-magic-bin==0.4.14; sys_platform == 'win32'
+
+# ============================================================
+# UTILITIES
+# ============================================================
+aiofiles==23.2.1
+python-dateutil==2.8.2
+
+# ============================================================
+# SYSTEM REQUIREMENTS
+# ============================================================
+# 1. Ghostscript (for PDF compression)
+#    - Windows: https://www.ghostscript.com/download/gsdnld.html
+#    - Linux: sudo apt-get install ghostscript
+#    - Mac: brew install ghostscript
+#
+# 2. Poppler (for PDF to image conversion)
+#    - Windows: Download from https://github.com/oschwartz10612/poppler-windows/releases/
+#    - Linux: sudo apt-get install poppler-utils
+#    - Mac: brew install poppler
+#
+# 3. LibreOffice (for Office document conversion)
+#    - Windows: https://www.libreoffice.org/download/download/
+#    - Linux: sudo apt-get install libreoffice
+#    - Mac: brew install libreoffice
+#
+# 4. FFmpeg (for video processing)
+#    - Windows: https://ffmpeg.org/download.html
+#    - Linux: sudo apt-get install ffmpeg
+#    - Mac: brew install ffmpeg
+#
+# 5. Java Runtime (for tabula-py - PDF to Excel)
+#    - Windows: https://www.java.com/download/
+#    - Linux: sudo apt-get install default-jre
+#    - Mac: brew install openjdk
+
+# ============================================================
+# OPTIONAL DEPENDENCIES
+# ============================================================
+# For better performance and additional features
+# uncomment as needed:
+
+# Better image processing (requires libvips)
+# pyvips==2.2.1
+
+# Advanced PDF features
+# pymupdf==1.23.7  # PyMuPDF for better PDF rendering
+
+# OCR capabilities
+# pytesseract==0.3.10
+# pillow-ocr==0.1.0

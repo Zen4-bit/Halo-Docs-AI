@@ -1,0 +1,269 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Aura OS Dark Theme (Default) */
+    --background: 5 5 5;
+    --surface: 18 18 18;
+    --surface-highlight: 30 30 30;
+    --text: 255 255 255;
+    --text-secondary: 161 161 170;
+    /* Zinc-400 */
+    --text-muted: 113 113 122;
+    /* Zinc-500 */
+
+    /* Amber/Gold Accent */
+    --primary: 255 193 7;
+    /* Amber-500 */
+    --primary-foreground: 0 0 0;
+
+    --secondary: 39 39 42;
+    /* Zinc-800 */
+    --secondary-foreground: 255 255 255;
+
+    --accent: 251 191 36;
+    /* Amber-400 */
+    --accent-foreground: 0 0 0;
+
+    --border: 39 39 42;
+    /* Zinc-800 */
+    --border-light: 63 63 70;
+    /* Zinc-700 */
+
+    /* Aura Gradients */
+    --gradient-primary: linear-gradient(135deg, #FFC107 0%, #F59E0B 100%);
+    --gradient-secondary: linear-gradient(135deg, #27272A 0%, #3F3F46 100%);
+    --gradient-surface: linear-gradient(180deg, #121212 0%, #181818 100%);
+    --gradient-card: linear-gradient(180deg, rgba(24, 24, 27, 0.8) 0%, rgba(9, 9, 11, 0.9) 100%);
+    --gradient-glow: radial-gradient(circle at center, rgba(255, 193, 7, 0.15) 0%, transparent 70%);
+  }
+
+  /* Keep .dark class same as root for compatibility */
+  .dark {
+    --background: 5 5 5;
+    --surface: 18 18 18;
+    --surface-highlight: 30 30 30;
+    --text: 255 255 255;
+    --text-secondary: 161 161 170;
+    --text-muted: 113 113 122;
+    --primary: 255 193 7;
+    --primary-foreground: 0 0 0;
+    --secondary: 39 39 42;
+    --secondary-foreground: 255 255 255;
+    --accent: 251 191 36;
+    --accent-foreground: 0 0 0;
+    --border: 39 39 42;
+    --border-light: 63 63 70;
+    --gradient-surface: linear-gradient(180deg, #121212 0%, #181818 100%);
+    --gradient-card: linear-gradient(180deg, rgba(24, 24, 27, 0.8) 0%, rgba(9, 9, 11, 0.9) 100%);
+  }
+
+  /* Light Theme */
+  .light {
+    --background: 255 255 255;
+    --surface: 249 250 251;
+    /* Gray-50 */
+    --surface-highlight: 243 244 246;
+    /* Gray-100 */
+    --text: 17 24 39;
+    /* Gray-900 */
+    --text-secondary: 75 85 99;
+    /* Gray-600 */
+    --text-muted: 107 114 128;
+    /* Gray-500 */
+
+    /* Amber/Gold Accent (same as dark but adjusted foreground) */
+    --primary: 245 158 11;
+    /* Amber-500 */
+    --primary-foreground: 255 255 255;
+
+    --secondary: 243 244 246;
+    /* Gray-100 */
+    --secondary-foreground: 17 24 39;
+    /* Gray-900 */
+
+    --accent: 251 191 36;
+    /* Amber-400 */
+    --accent-foreground: 17 24 39;
+    /* Gray-900 */
+
+    --border: 229 231 235;
+    /* Gray-200 */
+    --border-light: 209 213 219;
+    /* Gray-300 */
+
+    /* Light Mode Gradients */
+    --gradient-primary: linear-gradient(135deg, #F59E0B 0%, #FFC107 100%);
+    color: rgb(var(--text));
+    transition: background-color 0.5s ease, color 0.5s ease;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+    color: rgb(var(--text));
+    font-weight: 600;
+  }
+
+  p {
+    color: rgb(var(--text-secondary));
+    font-size: 0.95rem;
+    position: relative;
+    overflow: hidden;
+  }
+}
+
+@layer components {
+  .glass-card {
+    /* Performance: Removed backdrop-filter as it kills scroll performance */
+    background: rgba(18, 18, 18, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.2);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .dark .glass-card {
+    background: rgba(18, 18, 18, 0.6);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .light .glass-card {
+    background: rgba(255, 255, 255, 0.7);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .glass-card:hover {
+    /* Only animate opacity/color, avoid layout shifts */
+    /* Removed border-color change to prevent "white lines" */
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(30, 30, 30, 0.8);
+
+    /* 3D Glowing Effect - Optimized */
+    box-shadow:
+      0 15px 30px -5px rgba(0, 0, 0, 0.4),
+      /* Deep shadow */
+      0 0 15px -3px rgba(var(--primary), 0.25);
+    /* Inner/Outer Glow */
+
+    transform: translateY(-5px) translateZ(0);
+  }
+
+  .dark .glass-card:hover {
+    background: rgba(30, 30, 30, 0.8);
+    /* Removed border-color change */
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .light .glass-card:hover {
+    background: rgba(255, 255, 255, 0.95);
+    /* Removed border-color change */
+    border-color: rgba(0, 0, 0, 0.08);
+    box-shadow:
+      0 10px 15px -3px rgba(0, 0, 0, 0.15),
+      0 0 20px -5px rgba(var(--primary), 0.2);
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-semibold transition-colors duration-200 active:scale-[0.98];
+    border-radius: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.95rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-primary {
+    background: rgb(var(--primary));
+    /* Solid color is faster than gradient */
+    color: rgb(var(--primary-foreground));
+  }
+
+  .btn-primary:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+    box-shadow: 0 0 15px rgba(var(--primary), 0.3);
+  }
+
+  .btn-secondary {
+    background: rgb(var(--surface-highlight));
+    color: rgb(var(--text));
+    border: 1px solid rgb(var(--border));
+  }
+
+  .btn-secondary:hover {
+    background: rgb(var(--surface));
+    border-color: rgb(var(--primary));
+  }
+
+  /* Progress Bar Animations - Simplified */
+  @keyframes gradient {
+
+    0%,
+    100% {
+      opacity: 0.8;
+    }
+
+    50% {
+      opacity: 1;
+    }
+  }
+
+  .animate-gradient {
+    animation: gradient 3s ease infinite;
+  }
+
+  /* === PERFORMANCE OPTIMIZATIONS === */
+
+  /* GPU acceleration hints - ONLY for specific transform-heavy elements */
+  .gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* Remove backdrop-optimized class as we aren't using blurs anymore */
+  .backdrop-optimized {
+    background: inherit;
+  }
+
+  /* Reduce layout thrashing on hover effects */
+  .glass-card,
+  .btn {
+    will-change: auto;
+    /* Let browser decide, don't force memory usage */
+    transform: translateZ(0);
+  }
+}
+
+/* === ACCESSIBILITY: Reduced Motion Support === */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* === PAGE TRANSITION OPTIMIZATION === */
+@layer utilities {
+  .page-transition {
+    view-transition-name: page;
+  }
+
+  /* Faster link prefetch hint */
+  a[href^="/"] {
+    content-visibility: auto;
+  }
+}

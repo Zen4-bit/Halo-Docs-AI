@@ -1,0 +1,97 @@
+# ===========================================
+# HALO Docs AI - LOCAL Docker Compose
+# ===========================================
+# Usage: docker compose -f docker-compose.local.yml up --build
+# This file builds everything locally - NO online image pulls for app services
+# Backend: http://localhost:8080
+# Frontend: http://localhost:3000
+
+services:
+  # ===========================================
+  # Backend API (FastAPI + Python)
+  # ===========================================
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend.local
+    container_name: halo-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - API_PORT=8080
+      - PYTHON_ENV=development
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000,http://host.docker.internal:3000
+      - USE_LOCAL_STORAGE=true
+      - LOCAL_STORAGE_PATH=/app/uploads
+      # API Keys loaded from .env file
+      - VERTEX_AI_API_KEY=${VERTEX_AI_API_KEY:-}
+      - VERTEX_AI_ENDPOINT=${VERTEX_AI_ENDPOINT:-https://aiplatform.googleapis.com/v1/publishers/google/models}
+      - VERTEX_AI_GEMINI_MODEL=${VERTEX_AI_GEMINI_MODEL:-gemini-2.0-flash-exp}
+      - VERTEX_AI_IMAGEN_MODEL=${VERTEX_AI_IMAGEN_MODEL:-imagen-3.0-generate-001}
+      - VERTEX_AI_VIDEO_MODEL=${VERTEX_AI_VIDEO_MODEL:-veo-3.1-generate-preview}
+    volumes:
+      - ./apps/api:/app
+      - ./uploads:/app/uploads
+      - backend_cache:/root/.cache
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - halo-local-network
+
+  # ===========================================
+  # Frontend (Next.js)
+  # ===========================================
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend.local
+    container_name: halo-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_BASE=http://localhost:8080/api/v1
+      - NEXT_TELEMETRY_DISABLED=1
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+      - frontend_cache:/root/.npm
+    env_file:
+      - .env
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - halo-local-network
+
+# ===========================================
+# Volumes (Local persistent storage)
+# ===========================================
+volumes:
+  backend_cache:
+    name: halo-backend-cache
+  frontend_cache:
+    name: halo-frontend-cache
+
+# ===========================================
+# Networks
+# ===========================================
+networks:
+  halo-local-network:
+    driver: bridge
+    name: halo-local-network

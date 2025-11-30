@@ -1,0 +1,68 @@
+# FastAPI and server
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
+
+# Vertex AI HTTP client (no Google Cloud SDK needed)
+# Using httpx for direct API calls to Vertex AI
+
+# PDF processing
+PyPDF2==3.0.1
+pdfplumber==0.10.3
+pypdf==3.17.1
+reportlab==4.0.7
+
+# Image processing
+Pillow>=10.4.0
+pytesseract==0.3.10
+
+# Additional PDF tools
+pdfminer.six==20221105
+pdf2image==1.16.3
+
+# Data handling
+pydantic>=2.10.0
+email-validator>=2.2.0
+pydantic-settings>=2.7.0
+
+# HTTP and async
+httpx==0.25.2
+aiofiles==23.2.1
+
+# Media processing
+yt-dlp==2024.8.6
+youtube-transcript-api==0.6.1
+requests>=2.31.0,<3.0.0
+
+# Database - PostgreSQL + SQLAlchemy + Alembic
+sqlalchemy==2.0.23
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# Redis + Celery for async task queue
+redis==5.0.1
+celery==5.3.4
+
+# Cloud storage
+boto3==1.34.10
+google-cloud-storage==2.10.0
+
+# Authentication (kept for webhooks compatibility)
+svix==1.15.0
+python-jose[cryptography]==3.3.0
+bcrypt==4.1.2
+PyJWT==2.8.0
+
+# Resend email service
+resend>=0.7.0
+
+# Performance and monitoring
+structlog==23.2.0
+sentry-sdk[fastapi]==1.38.0
+
+# Development and testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+factory-boy==3.3.0

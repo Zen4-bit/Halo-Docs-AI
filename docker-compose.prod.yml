@@ -1,0 +1,136 @@
+# ===========================================
+# HALO Docs AI - Production Docker Compose
+# ===========================================
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: halo-docs-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-halo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-halo_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-halodocs}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-halo}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - halo-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: halo-docs-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - halo-network
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: halo-backend
+    ports:
+      - "${API_PORT:-8080}:8080"
+    environment:
+      - VERTEX_AI_API_KEY=${VERTEX_AI_API_KEY}
+      - VERTEX_AI_ENDPOINT=${VERTEX_AI_ENDPOINT:-https://aiplatform.googleapis.com/v1/publishers/google/models}
+      - VERTEX_AI_GEMINI_MODEL=${VERTEX_AI_GEMINI_MODEL:-gemini-2.0-flash-exp}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-halo}:${POSTGRES_PASSWORD:-halo_secure_password}@postgres:5432/${POSTGRES_DB:-halodocs}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - PYTHON_ENV=production
+      - CORS_ORIGINS=http://frontend:3000,http://localhost:3000
+      - USE_LOCAL_STORAGE=true
+      - LOCAL_STORAGE_PATH=/app/uploads
+    volumes:
+      - api_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - halo-network
+
+  # Celery Worker
+  worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: halo-worker
+    command: celery -A celery_app worker --loglevel=info --concurrency=4
+    environment:
+      - VERTEX_AI_API_KEY=${VERTEX_AI_API_KEY}
+      - VERTEX_AI_ENDPOINT=${VERTEX_AI_ENDPOINT:-https://aiplatform.googleapis.com/v1/publishers/google/models}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-halo}:${POSTGRES_PASSWORD:-halo_secure_password}@postgres:5432/${POSTGRES_DB:-halodocs}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - PYTHON_ENV=production
+      - USE_LOCAL_STORAGE=true
+      - LOCAL_STORAGE_PATH=/app/uploads
+    volumes:
+      - api_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - halo-network
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/web-dev.Dockerfile
+    container_name: halo-frontend
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE=http://backend:8080/api/v1
+      - NODE_ENV=production
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - halo-network
+
+volumes:
+  postgres_data:
+    name: halo-postgres-data
+  redis_data:
+    name: halo-redis-data
+  api_uploads:
+    name: halo-api-uploads
+
+networks:
+  halo-network:
+    driver: bridge
+    name: halo-docs-network

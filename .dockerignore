@@ -1,0 +1,80 @@
+# ===========================================
+# HALO Docs AI - Docker Ignore
+# ===========================================
+
+# Dependencies
+node_modules/
+**/node_modules/
+.pnp/
+.pnp.js
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+*.egg-info/
+
+# Environment files (use Docker env vars instead)
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Logs
+*.log
+logs/
+
+# Testing
+coverage/
+.pytest_cache/
+__tests__/
+
+# Temp files
+temp/
+tmp/
+*.tmp
+*.bak
+*.backup
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed in container)
+*.md
+!README.md
+docs/
+
+# Development files
+.prettierrc
+.prettierignore
+.eslintrc*
+tsconfig.tsbuildinfo
+
+# Database files
+*.db
+*.sqlite
+
+# Uploads (use volumes)
+uploads/
+storage/
