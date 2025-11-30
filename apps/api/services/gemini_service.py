@@ -568,11 +568,17 @@ Provide a comprehensive JSON response with the following structure:
     # ==================== IMAGE GENERATION PROMPTS ====================
     async def enhance_image_prompt(
         self,
-        user_prompt: str,
+        user_prompt: str = None,
+        prompt: str = None,
         style: str = "realistic",
         enhance_quality: bool = True
     ) -> str:
         """Enhance user prompt for better image generation"""
+        
+        # Support both parameter names
+        actual_prompt = user_prompt or prompt
+        if not actual_prompt:
+            return ""
         
         style_additions = {
             "realistic": "photorealistic, highly detailed, 8k resolution, professional photography",
@@ -586,7 +592,7 @@ Provide a comprehensive JSON response with the following structure:
         }
         
         enhancement_prompt = f"""Enhance this image generation prompt to be more detailed and effective.
-Original prompt: {user_prompt}
+Original prompt: {actual_prompt}
 Style: {style_additions.get(style, style_additions['realistic'])}
 {"Add quality boosters like: highly detailed, professional, award-winning" if enhance_quality else ""}
 
@@ -597,6 +603,278 @@ Provide only the enhanced prompt, nothing else."""
             task_type=TaskType.CHAT_SIMPLE,
             temperature=0.8
         )
+    
+    # ==================== IMAGE GENERATION ====================
+    
+    # Cache for available models
+    _available_models_cache: List[str] = []
+    _models_cache_time: float = 0
+    
+    async def _get_available_image_models(self) -> List[str]:
+        """
+        Dynamically detect available image generation models.
+        Caches results for 5 minutes.
+        """
+        import time
+        
+        # Return cached if less than 5 minutes old
+        if self._available_models_cache and (time.time() - self._models_cache_time) < 300:
+            return self._available_models_cache
+        
+        image_models = []
+        
+        try:
+            # List all available models
+            models = await asyncio.to_thread(genai.list_models)
+            
+            for model in models:
+                model_name = model.name.replace("models/", "")
+                supported_methods = getattr(model, 'supported_generation_methods', [])
+                
+                # Check for image generation capability
+                if any(method in str(supported_methods).lower() for method in ['generatecontent', 'predict']):
+                    # Prioritize imagen models
+                    if 'imagen' in model_name.lower():
+                        image_models.insert(0, model_name)
+                    # Add gemini models that might support image output
+                    elif 'gemini' in model_name.lower() and ('flash' in model_name.lower() or 'pro' in model_name.lower()):
+                        image_models.append(model_name)
+            
+            logger.info(f"Detected image-capable models: {image_models[:10]}")
+            
+        except Exception as e:
+            logger.error(f"Error listing models: {e}")
+        
+        # Fallback model list if detection fails
+        if not image_models:
+            image_models = [
+                "gemini-2.0-flash-exp",
+                "gemini-1.5-flash",
+                "gemini-1.5-pro",
+            ]
+        
+        self._available_models_cache = image_models
+        self._models_cache_time = time.time()
+        
+        return image_models
+    
+    async def generate_image(
+        self,
+        prompt: str,
+        style: str = "realistic",
+        width: int = 1024,
+        height: int = 1024,
+        enhance_prompt: bool = True,
+        negative_prompt: str = ""
+    ) -> Dict[str, Any]:
+        """
+        Generate image using available Gemini/Imagen models.
+        Auto-detects available models and uses correct API methods.
+        Returns base64 encoded image data or enhanced prompt as fallback.
+        """
+        try:
+            # First enhance the prompt if requested
+            final_prompt = prompt
+            if enhance_prompt:
+                final_prompt = await self.enhance_image_prompt(
+                    user_prompt=prompt,
+                    style=style,
+                    enhance_quality=True
+                )
+            
+            logger.info(f"Generating image with prompt: {final_prompt[:100]}...")
+            
+            # Try Gemini 2.0 Flash image generation first (most reliable)
+            gemini_result = await self._try_gemini_image_generation(final_prompt, width, height)
+            if gemini_result.get("success"):
+                gemini_result["original_prompt"] = prompt
+                gemini_result["style"] = style
+                return gemini_result
+            
+            # Fallback to Imagen models (may not be available for all API keys)
+            imagen_result = await self._try_imagen_generation(final_prompt, width, height)
+            if imagen_result.get("success"):
+                imagen_result["original_prompt"] = prompt
+                imagen_result["style"] = style
+                return imagen_result
+            
+            # All methods failed - return enhanced prompt for external use
+            logger.warning("All image generation methods failed, returning enhanced prompt")
+            return {
+                "success": False,
+                "error": "Image generation models are not available with your API key. Use the enhanced prompt with an external image generator (DALL-E, Midjourney, Stable Diffusion).",
+                "enhanced_prompt": final_prompt,
+                "original_prompt": prompt,
+                "style": style,
+                "fallback": True,
+                "dimensions": {"width": width, "height": height}
+            }
+                    
+        except Exception as e:
+            logger.error(f"Image generation error: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": f"Image generation failed: {str(e)}",
+                "original_prompt": prompt,
+                "style": style
+            }
+    
+    async def _try_imagen_generation(self, prompt: str, width: int, height: int) -> Dict[str, Any]:
+        """Try generating image using google-genai Imagen API."""
+        try:
+            from google import genai as google_genai
+            from google.genai import types
+            
+            client = google_genai.Client(api_key=GEMINI_API_KEY)
+            
+            # Determine aspect ratio
+            if width == height:
+                aspect_ratio = "1:1"
+            elif width > height:
+                aspect_ratio = "16:9"
+            else:
+                aspect_ratio = "9:16"
+            
+            # List of Imagen models to try in order
+            imagen_models = [
+                "imagen-3.0-generate-001",
+                "imagen-3.0-fast-generate-001", 
+                "imagegeneration@006",
+                "imagegeneration@005",
+                "imagegeneration@002",
+            ]
+            
+            for model_id in imagen_models:
+                try:
+                    logger.info(f"Trying Imagen model: {model_id}")
+                    
+                    response = await asyncio.to_thread(
+                        client.models.generate_images,
+                        model=model_id,
+                        prompt=prompt,
+                        config=types.GenerateImagesConfig(
+                            number_of_images=1,
+                            aspect_ratio=aspect_ratio,
+                            safety_filter_level="block_only_high",
+                        )
+                    )
+                    
+                    if response and hasattr(response, 'generated_images') and response.generated_images:
+                        image = response.generated_images[0]
+                        if hasattr(image, 'image') and hasattr(image.image, 'image_bytes'):
+                            image_bytes = image.image.image_bytes
+                            image_base64 = base64.b64encode(image_bytes).decode('utf-8')
+                            
+                            logger.info(f"Successfully generated image with {model_id}")
+                            return {
+                                "success": True,
+                                "image": image_base64,
+                                "mime_type": "image/png",
+                                "prompt_used": prompt,
+                                "model_used": model_id,
+                                "dimensions": {"width": width, "height": height}
+                            }
+                            
+                except Exception as model_error:
+                    error_str = str(model_error).lower()
+                    # Skip to next model on 404/not found errors
+                    if '404' in error_str or 'not found' in error_str or 'not_found' in error_str:
+                        logger.warning(f"Model {model_id} not available: {model_error}")
+                        continue
+                    # For other errors, log and continue
+                    logger.warning(f"Model {model_id} failed: {model_error}")
+                    continue
+            
+            return {"success": False, "error": "No Imagen models available"}
+            
+        except ImportError:
+            logger.warning("google-genai library not available")
+            return {"success": False, "error": "google-genai library not installed"}
+        except Exception as e:
+            logger.error(f"Imagen generation failed: {e}")
+            return {"success": False, "error": str(e)}
+    
+    async def _try_gemini_image_generation(self, prompt: str, width: int, height: int) -> Dict[str, Any]:
+        """
+        Try generating image using Gemini 2.0 Flash image generation model.
+        Uses google-genai client with response_modalities for proper image output.
+        """
+        try:
+            from google import genai as google_genai
+            from google.genai import types as genai_types
+            
+            client = google_genai.Client(api_key=GEMINI_API_KEY)
+            
+            # Models that support image generation with response_modalities
+            image_gen_models = [
+                "gemini-2.0-flash-exp-image-generation",
+                "gemini-2.0-flash-exp",
+            ]
+            
+            for model_name in image_gen_models:
+                try:
+                    logger.info(f"Trying Gemini image model: {model_name}")
+                    
+                    # Use google-genai client with response_modalities for image output
+                    response = await asyncio.to_thread(
+                        client.models.generate_content,
+                        model=model_name,
+                        contents=prompt,
+                        config=genai_types.GenerateContentConfig(
+                            response_modalities=["IMAGE", "TEXT"],
+                            temperature=1.0,
+                        )
+                    )
+                    
+                    # Extract image from response
+                    if hasattr(response, 'candidates') and response.candidates:
+                        for candidate in response.candidates:
+                            if hasattr(candidate, 'content') and candidate.content:
+                                for part in candidate.content.parts:
+                                    # Check for inline image data
+                                    if hasattr(part, 'inline_data') and part.inline_data:
+                                        inline = part.inline_data
+                                        mime_type = getattr(inline, 'mime_type', '')
+                                        
+                                        if 'image' in mime_type:
+                                            raw_data = getattr(inline, 'data', None)
+                                            if raw_data:
+                                                # Encode to base64
+                                                if isinstance(raw_data, bytes):
+                                                    image_base64 = base64.b64encode(raw_data).decode('utf-8')
+                                                else:
+                                                    image_base64 = str(raw_data)
+                                                
+                                                logger.info(f"Successfully generated image with {model_name}")
+                                                return {
+                                                    "success": True,
+                                                    "image": image_base64,
+                                                    "mime_type": mime_type,
+                                                    "prompt_used": prompt,
+                                                    "model_used": model_name,
+                                                    "dimensions": {"width": width, "height": height}
+                                                }
+                    
+                    logger.info(f"Model {model_name} did not return image data")
+                    continue
+                    
+                except Exception as e:
+                    error_str = str(e).lower()
+                    logger.warning(f"Gemini model {model_name} error: {e}")
+                    if '404' in error_str or 'not found' in error_str:
+                        continue
+                    if '400' in error_str or 'invalid' in error_str:
+                        continue
+                    continue
+            
+            return {"success": False, "error": "Gemini image generation models did not return images"}
+            
+        except ImportError:
+            logger.warning("google-genai library not available for Gemini image generation")
+            return {"success": False, "error": "google-genai library required for image generation"}
+        except Exception as e:
+            logger.error(f"Gemini image generation failed: {e}")
+            return {"success": False, "error": str(e)}
 
 
 # Singleton instance

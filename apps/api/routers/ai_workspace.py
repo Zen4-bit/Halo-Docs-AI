@@ -270,33 +270,49 @@ async def ai_generate_image(
     style: str = Form("realistic"),
     enhance_prompt: bool = Form(True),
     width: int = Form(1024),
-    height: int = Form(1024)
+    height: int = Form(1024),
+    negative_prompt: str = Form("")
 ):
     """
-    Generate image using Gemini
-    Note: Actual image generation uses Imagen or similar
-    This provides prompt enhancement and styling
+    Generate image from text prompt using Gemini/Imagen
+    Returns base64 encoded image or enhanced prompt as fallback
     """
     try:
-        # Enhance prompt if requested
-        final_prompt = prompt
-        if enhance_prompt:
-            final_prompt = await gemini_service.enhance_image_prompt(
-                user_prompt=prompt,
-                style=style
-            )
+        logger.info(f"Image generation request - prompt: {prompt[:50]}..., style: {style}")
         
-        # For now, return the enhanced prompt
-        # Actual image generation would integrate with Imagen API
-        return {
-            "original_prompt": prompt,
-            "enhanced_prompt": final_prompt,
-            "style": style,
-            "dimensions": {"width": width, "height": height},
-            "message": "Image generation prompt ready. Integrate with Imagen API for actual generation."
-        }
+        result = await gemini_service.generate_image(
+            prompt=prompt,
+            style=style,
+            width=width,
+            height=height,
+            enhance_prompt=enhance_prompt,
+            negative_prompt=negative_prompt
+        )
+        
+        if result.get("success"):
+            return {
+                "success": True,
+                "image": result["image"],
+                "mime_type": result.get("mime_type", "image/png"),
+                "prompt_used": result.get("prompt_used", prompt),
+                "original_prompt": prompt,
+                "style": style,
+                "dimensions": {"width": width, "height": height}
+            }
+        else:
+            # Return fallback with enhanced prompt
+            return {
+                "success": False,
+                "error": result.get("error", "Image generation failed"),
+                "enhanced_prompt": result.get("enhanced_prompt", prompt),
+                "original_prompt": prompt,
+                "style": style,
+                "dimensions": {"width": width, "height": height},
+                "fallback": True
+            }
     
     except Exception as e:
+        logger.error(f"Image generation endpoint error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -657,6 +673,40 @@ async def health_check():
         "model_selection": "dynamic",
         "streaming": "supported"
     }
+
+
+@router.get("/models")
+async def list_available_models():
+    """List all available AI models for debugging"""
+    import google.generativeai as genai
+    
+    try:
+        models = list(genai.list_models())
+        model_list = []
+        image_capable = []
+        
+        for model in models:
+            model_name = model.name.replace("models/", "")
+            methods = getattr(model, 'supported_generation_methods', [])
+            
+            model_info = {
+                "name": model_name,
+                "display_name": getattr(model, 'display_name', model_name),
+                "methods": list(methods) if methods else [],
+            }
+            model_list.append(model_info)
+            
+            # Check if it might support images
+            if 'imagen' in model_name.lower() or 'image' in model_name.lower():
+                image_capable.append(model_name)
+        
+        return {
+            "total_models": len(model_list),
+            "models": model_list,
+            "image_capable": image_capable
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
 
 # ==================== SUPPORTED LANGUAGES ====================

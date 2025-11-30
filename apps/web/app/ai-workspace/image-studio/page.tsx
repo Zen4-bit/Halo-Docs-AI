@@ -3,7 +3,8 @@
 import { useState, useRef } from 'react';
 import { 
   Image, Wand2, Loader2, Download, RefreshCw, Upload, X, Sparkles,
-  Palette, Eye, Zap, Settings2, Copy, Check, ImagePlus, Eraser, ZoomIn
+  Palette, Eye, Zap, Settings2, Copy, Check, ImagePlus, Eraser, ZoomIn,
+  ImageIcon, ChevronDown
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AIResponseRenderer from '@/components/ai/AIResponseRenderer';
@@ -20,9 +21,16 @@ const STYLES = [
 ];
 
 const FEATURES = [
-  { id: 'analyze', label: 'Analyze Image', icon: Eye, description: 'Get detailed AI description' },
-  { id: 'enhance', label: 'Enhance Prompt', icon: Sparkles, description: 'AI-improve your prompt' },
-  { id: 'variations', label: 'Generate Variations', icon: ImagePlus, description: 'Create image variants' },
+  { id: 'generate', label: 'Generate Image', icon: Wand2, description: 'Create image from prompt', requiresImage: false },
+  { id: 'analyze', label: 'Analyze Image', icon: Eye, description: 'Get detailed AI description', requiresImage: true },
+  { id: 'enhance', label: 'Enhance Prompt', icon: Sparkles, description: 'AI-improve your prompt', requiresImage: false },
+  { id: 'variations', label: 'Generate Variations', icon: ImagePlus, description: 'Create image variants', requiresImage: true },
+];
+
+const SIZE_OPTIONS = [
+  { id: 'square', label: 'Square', width: 1024, height: 1024, icon: '⬜' },
+  { id: 'landscape', label: 'Landscape', width: 1344, height: 768, icon: '🖼️' },
+  { id: 'portrait', label: 'Portrait', width: 768, height: 1344, icon: '📱' },
 ];
 
 export default function ImageStudioPage() {
@@ -36,6 +44,11 @@ export default function ImageStudioPage() {
   const [uploadedImage, setUploadedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedImageMime, setGeneratedImageMime] = useState<string>('image/png');
+  const [selectedSize, setSelectedSize] = useState('square');
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [enhanceBeforeGenerate, setEnhanceBeforeGenerate] = useState(true);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -53,6 +66,52 @@ export default function ImageStudioPage() {
     setImagePreview(null);
     setAnalysis('');
     if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const handleGenerateImage = async () => {
+    if (!prompt.trim()) return;
+    
+    setLoading(true);
+    setActiveFeature('generate');
+    setError('');
+    setGeneratedImage(null);
+
+    try {
+      const sizeConfig = SIZE_OPTIONS.find(s => s.id === selectedSize) ?? SIZE_OPTIONS[0];
+      
+      const response = await fetch('/api/ai/image-studio/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          style,
+          enhance_prompt: enhanceBeforeGenerate,
+          width: sizeConfig?.width ?? 1024,
+          height: sizeConfig?.height ?? 1024,
+        }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success && data.image) {
+        setGeneratedImage(data.image);
+        setGeneratedImageMime(data.mime_type || 'image/png');
+        if (data.prompt_used) {
+          setEnhancedPrompt(data.prompt_used);
+        }
+      } else if (data.fallback && data.enhanced_prompt) {
+        // Fallback: show enhanced prompt if image generation failed
+        setEnhancedPrompt(data.enhanced_prompt);
+        setError(data.error || 'Image generation is not available. Use the enhanced prompt with an external image generator.');
+      } else if (data.error) {
+        setError(data.error);
+      }
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+      setActiveFeature(null);
+    }
   };
 
   const handleEnhancePrompt = async () => {
@@ -159,6 +218,14 @@ export default function ImageStudioPage() {
     setEnhancedPrompt('');
   };
 
+  const downloadGeneratedImage = () => {
+    if (!generatedImage) return;
+    const link = document.createElement('a');
+    link.href = `data:${generatedImageMime};base64,${generatedImage}`;
+    link.download = `generated-image-${Date.now()}.png`;
+    link.click();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
       {/* Header */}
@@ -206,28 +273,31 @@ export default function ImageStudioPage() {
         </div>
 
         {/* Feature Buttons */}
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-4 gap-4">
           {FEATURES.map(feature => {
             const Icon = feature.icon;
             const isActive = activeFeature === feature.id;
-            const isDisabled = feature.id !== 'enhance' && !uploadedImage;
+            const needsPrompt = feature.id === 'generate' || feature.id === 'enhance';
+            const needsImage = feature.requiresImage;
+            const isDisabled = (needsPrompt && !prompt.trim()) || (needsImage && !uploadedImage);
             
             return (
               <button
                 key={feature.id}
                 onClick={() => {
-                  if (feature.id === 'analyze') handleAnalyzeImage();
+                  if (feature.id === 'generate') handleGenerateImage();
+                  else if (feature.id === 'analyze') handleAnalyzeImage();
                   else if (feature.id === 'enhance') handleEnhancePrompt();
                   else if (feature.id === 'variations') handleGenerateVariations();
                 }}
-                disabled={loading || (feature.id === 'enhance' ? !prompt.trim() : isDisabled)}
-                className={`p-4 rounded-2xl border text-left transition-all ${isActive ? 'bg-orange-500/20 border-orange-500/50' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'} disabled:opacity-50 disabled:cursor-not-allowed`}
+                disabled={loading || isDisabled}
+                className={`p-4 rounded-2xl border text-left transition-all ${isActive ? 'bg-orange-500/20 border-orange-500/50' : feature.id === 'generate' ? 'bg-gradient-to-br from-orange-500/10 to-red-500/10 border-orange-500/30 hover:border-orange-500/50' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700'} disabled:opacity-50 disabled:cursor-not-allowed`}
               >
                 <div className="flex items-center gap-3">
                   {isActive && loading ? (
                     <Loader2 className="w-6 h-6 text-orange-400 animate-spin" />
                   ) : (
-                    <Icon className={`w-6 h-6 ${isActive ? 'text-orange-400' : 'text-zinc-400'}`} />
+                    <Icon className={`w-6 h-6 ${isActive || feature.id === 'generate' ? 'text-orange-400' : 'text-zinc-400'}`} />
                   )}
                   <div>
                     <p className="font-medium text-white">{feature.label}</p>
@@ -271,8 +341,98 @@ export default function ImageStudioPage() {
           </div>
         </div>
 
+        {/* Advanced Options */}
+        <div className="p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800">
+          <button 
+            onClick={() => setShowAdvanced(!showAdvanced)} 
+            className="w-full flex items-center justify-between text-white"
+          >
+            <span className="flex items-center gap-2 font-medium">
+              <Settings2 className="w-5 h-5 text-orange-400" /> Generation Options
+            </span>
+            <ChevronDown className={`w-5 h-5 transition-transform ${showAdvanced ? 'rotate-180' : ''}`} />
+          </button>
+          
+          {showAdvanced && (
+            <div className="mt-4 pt-4 border-t border-zinc-800 space-y-4">
+              {/* Size Selection */}
+              <div>
+                <label className="text-sm text-zinc-400 mb-2 block">Image Size</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {SIZE_OPTIONS.map(size => (
+                    <button
+                      key={size.id}
+                      onClick={() => setSelectedSize(size.id)}
+                      className={`p-3 rounded-xl border text-center transition-all ${selectedSize === size.id ? 'bg-orange-500/20 border-orange-500/50 text-white' : 'bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:border-zinc-600'}`}
+                    >
+                      <span className="text-xl">{size.icon}</span>
+                      <p className="text-xs mt-1">{size.label}</p>
+                      <p className="text-xs text-zinc-500">{size.width}x{size.height}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              {/* Enhance Toggle */}
+              <label className="flex items-center gap-3 p-3 rounded-xl bg-zinc-800/50 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={enhanceBeforeGenerate} 
+                  onChange={(e) => setEnhanceBeforeGenerate(e.target.checked)} 
+                  className="w-4 h-4 rounded accent-orange-500" 
+                />
+                <Sparkles className="w-5 h-5 text-orange-400" />
+                <div>
+                  <span className="text-sm text-zinc-300">Auto-enhance prompt</span>
+                  <p className="text-xs text-zinc-500">AI will improve your prompt before generating</p>
+                </div>
+              </label>
+            </div>
+          )}
+        </div>
+
         {/* Error */}
         {error && <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400">{error}</div>}
+
+        {/* Generated Image */}
+        {generatedImage && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-orange-400" /> Generated Image
+              </h3>
+              <div className="flex gap-2">
+                <button onClick={downloadGeneratedImage} className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white" title="Download">
+                  <Download className="w-4 h-4" />
+                </button>
+                <button onClick={() => setGeneratedImage(null)} className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-red-400" title="Remove">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex justify-center">
+              <img 
+                src={`data:${generatedImageMime};base64,${generatedImage}`} 
+                alt="Generated" 
+                className="max-w-full max-h-[600px] rounded-xl shadow-2xl shadow-black/50" 
+              />
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button 
+                onClick={handleGenerateImage} 
+                disabled={loading}
+                className="px-4 py-2 rounded-xl bg-orange-500/20 text-orange-400 text-sm hover:bg-orange-500/30 transition-colors flex items-center gap-2"
+              >
+                <RefreshCw className="w-4 h-4" /> Regenerate
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Analysis Result */}
         {analysis && (
@@ -325,11 +485,11 @@ export default function ImageStudioPage() {
         )}
 
         {/* Empty State */}
-        {!loading && !analysis && !enhancedPrompt && !error && (
+        {!loading && !analysis && !enhancedPrompt && !generatedImage && !error && (
           <div className="p-12 rounded-2xl bg-zinc-800/30 border border-zinc-700/50 text-center">
             <Wand2 className="w-16 h-16 mx-auto mb-4 text-zinc-600" />
-            <p className="text-zinc-400 mb-2">Upload an image to analyze or enhance your prompts</p>
-            <p className="text-sm text-zinc-500">Gemini Vision will describe images and help you create better prompts</p>
+            <p className="text-zinc-400 mb-2">Enter a prompt to generate an image, or upload an image to analyze</p>
+            <p className="text-sm text-zinc-500">Gemini will create images from text and help you enhance your prompts</p>
           </div>
         )}
       </main>
