@@ -48,6 +48,14 @@ MANIFEST
 *~
 .project
 .settings/
+
+# ============ Assets (Large Files) ============
+# Keep screenshots, exclude large videos (upload via GitHub releases or LFS)
+assets/videos/*.mp4
+assets/videos/*.mov
+assets/videos/*.avi
+assets/gifs/*.gif
+Videos/
 *.sublime-workspace
 *.sublime-project
 
