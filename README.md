@@ -45,7 +45,8 @@ https://github.com/user-attachments/assets/demo.mp4
 
 *Full platform walkthrough demonstrating AI workspace, document tools, and real-time processing*
 
-**[▶️ Watch Full Demo](assets/videos/demo.mp4)**
+
+**[▶️ Watch Full Demo](https://github.com/user-attachments/assets/6907646e-327e-4666-95ec-dc6f2367a0f1)**
 
 </div>
 
