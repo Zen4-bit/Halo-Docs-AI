@@ -41,7 +41,7 @@ This project demonstrates my expertise in building scalable full-stack applicati
 
 ## 🎬 Demo Video
 
-https://github.com/user-attachments/assets/demo.mp4
+https://github.com/user-attachments/assets/6907646e-327e-4666-95ec-dc6f2367a0f1
 
 *Full platform walkthrough demonstrating AI workspace, document tools, and real-time processing*
 
