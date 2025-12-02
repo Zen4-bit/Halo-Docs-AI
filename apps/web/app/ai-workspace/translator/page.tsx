@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
-import { Languages, ArrowRightLeft, Loader2, Copy, Check } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Languages, ArrowRightLeft, Loader2, Copy, Check, Download } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AIResponseRenderer from '@/components/ai/AIResponseRenderer';
+import { useAIHistory } from '@/context/AIHistoryContext';
 
 const LANGUAGES = [
     'English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese',
@@ -19,6 +20,43 @@ export default function TranslatorPage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [copied, setCopied] = useState(false);
+    
+    // Shared history context
+    const { updateCurrentSession, selectedItemData, isNewChat } = useAIHistory();
+    
+    // Restore session when a history item is selected
+    useEffect(() => {
+        if (selectedItemData) {
+            try {
+                if (selectedItemData.text) setText(selectedItemData.text);
+                if (selectedItemData.targetLanguage) setTargetLanguage(selectedItemData.targetLanguage);
+                if (selectedItemData.translatedText) setTranslatedText(selectedItemData.translatedText);
+            } catch (error) {
+                console.error('Error restoring translator session:', error);
+            }
+        }
+    }, [selectedItemData]);
+    
+    // Handle new chat action
+    useEffect(() => {
+        if (isNewChat) {
+            setText('');
+            setTargetLanguage('Spanish');
+            setTranslatedText('');
+            setError('');
+        }
+    }, [isNewChat]);
+    
+    // Save to history when translation is complete
+    useEffect(() => {
+        if (translatedText && !loading) {
+            updateCurrentSession(
+                text.slice(0, 50) + (text.length > 50 ? '...' : ''),
+                { text, targetLanguage, translatedText },
+                translatedText.slice(0, 100)
+            );
+        }
+    }, [translatedText, loading, updateCurrentSession]);
 
     const handleTranslate = async () => {
         if (!text.trim()) return;
@@ -60,42 +98,57 @@ export default function TranslatorPage() {
         }
     };
 
-    return (
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-8">
-                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500 to-emerald-500 flex items-center justify-center">
-                    <Languages className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                    <h1 className="text-3xl font-bold text-white">AI Translator</h1>
-                    <p className="text-slate-400">Translate text between 100+ languages</p>
-                </div>
-            </div>
+    const handleDownload = () => {
+        const blob = new Blob([translatedText], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'translation.txt';
+        a.click();
+    };
 
-            <div className="space-y-6">
+    // Listen for tool actions from header
+    useEffect(() => {
+        const handleToolAction = (e: CustomEvent) => {
+            switch (e.detail) {
+                case 'copy':
+                    handleCopy();
+                    break;
+                case 'download':
+                    handleDownload();
+                    break;
+            }
+        };
+        window.addEventListener('tool-action', handleToolAction as EventListener);
+        return () => window.removeEventListener('tool-action', handleToolAction as EventListener);
+    }, [translatedText]);
+
+    return (
+        <div className="flex flex-col h-full pt-12 md:pt-0">
+            <div className="flex-1 overflow-y-auto min-h-0">
+                <div className="max-w-[850px] mx-auto px-3 sm:px-4 py-4 space-y-4">
                 {/* Language Selection */}
                 <div className="flex items-center gap-4">
                     <div className="flex-1">
-                        <label className="block text-sm font-medium text-slate-400 mb-2">Source</label>
-                        <div className="px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-300">
+                        <label className="block text-sm font-medium tool-text-secondary mb-2">Source</label>
+                        <div className="px-4 py-3 rounded-xl tool-bg-surface tool-border border tool-text-secondary">
                             Auto-detect
                         </div>
                     </div>
                     
                     <button 
                         onClick={handleSwap}
-                        className="mt-6 p-3 rounded-xl bg-slate-800 border border-slate-700 hover:border-primary transition-colors"
+                        className="mt-6 p-3 rounded-xl tool-bg-surface tool-border border hover:border-primary transition-colors"
                     >
-                        <ArrowRightLeft className="w-5 h-5 text-slate-400" />
+                        <ArrowRightLeft className="w-5 h-5 tool-text-muted" />
                     </button>
                     
                     <div className="flex-1">
-                        <label className="block text-sm font-medium text-slate-400 mb-2">Target Language</label>
+                        <label className="block text-sm font-medium tool-text-secondary mb-2">Target Language</label>
                         <select
                             value={targetLanguage}
                             onChange={(e) => setTargetLanguage(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white focus:border-primary focus:outline-none"
+                            className="tool-input w-full px-4 py-3 rounded-xl focus:border-primary"
                         >
                             {LANGUAGES.map(lang => (
                                 <option key={lang} value={lang}>{lang}</option>
@@ -108,15 +161,15 @@ export default function TranslatorPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Input */}
                     <div>
-                        <label className="block text-sm font-medium text-slate-400 mb-2">Original Text</label>
+                        <label className="block text-sm font-medium tool-text-secondary mb-2">Original Text</label>
                         <textarea
                             value={text}
                             onChange={(e) => setText(e.target.value)}
                             placeholder="Enter text to translate..."
                             rows={8}
-                            className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white placeholder-slate-500 focus:border-primary focus:outline-none resize-none"
+                            className="tool-input w-full px-4 py-3 rounded-xl focus:border-primary resize-none"
                         />
-                        <div className="mt-2 text-sm text-slate-500 text-right">
+                        <div className="mt-2 text-sm tool-text-muted text-right">
                             {text.length} characters
                         </div>
                     </div>
@@ -124,7 +177,7 @@ export default function TranslatorPage() {
                     {/* Output */}
                     <div>
                         <div className="flex items-center justify-between mb-2">
-                            <label className="text-sm font-medium text-slate-400">Translation</label>
+                            <label className="text-sm font-medium tool-text-secondary">Translation</label>
                             {translatedText && (
                                 <button
                                     onClick={handleCopy}
@@ -135,7 +188,7 @@ export default function TranslatorPage() {
                                 </button>
                             )}
                         </div>
-                        <div className="w-full min-h-[200px] px-4 py-3 rounded-xl bg-slate-800/50 border border-slate-700 text-slate-300 overflow-hidden">
+                        <div className="w-full min-h-[200px] px-4 py-3 rounded-xl tool-bg-surface tool-border border tool-text-secondary overflow-hidden">
                             {loading ? (
                                 <motion.div 
                                     initial={{ opacity: 0 }}
@@ -171,7 +224,7 @@ export default function TranslatorPage() {
                                     <AIResponseRenderer content={translatedText} isStreaming={false} />
                                 </motion.div>
                             ) : (
-                                <p className="text-slate-500">Translation will appear here...</p>
+                                <p className="tool-text-muted">Translation will appear here...</p>
                             )}
                         </div>
                     </div>
@@ -183,25 +236,30 @@ export default function TranslatorPage() {
                         {error}
                     </div>
                 )}
+                </div>
+            </div>
 
-                {/* Translate Button */}
-                <button
-                    onClick={handleTranslate}
-                    disabled={loading || !text.trim()}
-                    className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold hover:from-green-600 hover:to-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all"
-                >
-                    {loading ? (
-                        <>
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            Translating...
-                        </>
-                    ) : (
-                        <>
-                            <Languages className="w-5 h-5" />
-                            Translate
-                        </>
-                    )}
-                </button>
+            {/* Translate Button - Fixed at bottom */}
+            <div className="flex-shrink-0 border-t border-border bg-surface/95 backdrop-blur-xl">
+                <div className="max-w-[850px] mx-auto px-4 py-2">
+                    <button
+                        onClick={handleTranslate}
+                        disabled={loading || !text.trim()}
+                        className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold hover:from-green-600 hover:to-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-all shadow-lg hover:shadow-green-500/25"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-5 h-5 animate-spin" />
+                                Translating...
+                            </>
+                        ) : (
+                            <>
+                                <Languages className="w-5 h-5" />
+                                Translate
+                            </>
+                        )}
+                    </button>
+                </div>
             </div>
         </div>
     );

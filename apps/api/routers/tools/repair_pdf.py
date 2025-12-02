@@ -14,6 +14,20 @@ router = APIRouter(prefix="/repair-pdf", tags=["PDF Tools"])
 @router.post("")
 async def repair_pdf(
     file: UploadFile = File(..., description="PDF file to repair"),
+    # Repair Mode
+    repairMode: str = Form("quick", description="Repair mode: quick, deep"),
+    # Fix Options
+    fixObjects: bool = Form(True, description="Fix corrupted objects"),
+    fixStreams: bool = Form(True, description="Fix compressed streams"),
+    fixPageTree: bool = Form(True, description="Rebuild page tree"),
+    fixFonts: bool = Form(True, description="Repair font references"),
+    fixMetadata: bool = Form(True, description="Fix metadata"),
+    # Cleanup
+    removeBlankPages: bool = Form(False, description="Remove blank pages"),
+    removeDuplicates: bool = Form(False, description="Remove duplicate pages"),
+    # Optimization
+    optimizeImages: bool = Form(False, description="Optimize embedded images"),
+    linearize: bool = Form(True, description="Linearize for web viewing"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """

@@ -41,7 +41,7 @@ const socialLinks = [
 
 const Footer = memo(function Footer() {
   return (
-    <footer className="relative bg-background border-t border-border overflow-hidden pt-20 pb-10">
+    <footer className="relative bg-background border-t border-border overflow-hidden pt-12 md:pt-20 pb-8 md:pb-10">
       {/* Background Effects */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute bottom-0 left-1/4 w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px]" />
@@ -50,9 +50,9 @@ const Footer = memo(function Footer() {
       </div>
 
       <div className="container mx-auto px-4 relative z-10">
-        <div className="grid grid-cols-1 lg:grid-cols-6 gap-12 mb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-6 gap-8 md:gap-12 mb-10 md:mb-16">
           {/* Brand Section */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="lg:col-span-2 space-y-6 md:space-y-8">
             <Link href="/" className="inline-flex items-center space-x-3 group">
               <div className="relative">
                 <div className="absolute inset-0 bg-primary blur-lg opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
@@ -66,7 +66,7 @@ const Footer = memo(function Footer() {
               </div>
             </Link>
 
-            <p className="text-text-secondary leading-relaxed max-w-sm text-lg">
+            <p className="text-text-secondary leading-relaxed max-w-sm text-base md:text-lg">
               Next-generation document intelligence platform that transforms how teams work with information through AI-powered automation.
             </p>
 
@@ -104,7 +104,7 @@ const Footer = memo(function Footer() {
           </div>
 
           {/* Links Sections */}
-          <div className="lg:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="lg:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             {Object.entries(footerLinks).map(([category, links], categoryIndex) => (
               <div key={category} className="space-y-6">
                 <h3 className="text-sm font-bold text-text uppercase tracking-wider">
@@ -128,7 +128,7 @@ const Footer = memo(function Footer() {
         </div>
 
         {/* Contact Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-10 md:mb-16">
           {[
             { icon: Mail, label: 'Email Us', value: 'py786656@gmail.com', href: 'mailto:py786656@gmail.com' },
             { icon: Phone, label: 'Call Us', value: '+91-9807644112', href: 'tel:+919807644112' },
@@ -140,10 +140,10 @@ const Footer = memo(function Footer() {
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.1 }}
-              className="flex items-center space-x-4 p-6 rounded-2xl bg-surface-highlight border border-border hover:bg-surface hover:border-primary/30 transition-all duration-300 group"
+              className="flex items-center space-x-3 md:space-x-4 p-4 md:p-6 rounded-xl md:rounded-2xl bg-surface-highlight border border-border hover:bg-surface hover:border-primary/30 transition-all duration-300 group"
             >
-              <div className="w-12 h-12 bg-surface rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-primary">
-                <item.icon className="w-6 h-6" />
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-surface rounded-lg md:rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300 text-primary flex-shrink-0">
+                <item.icon className="w-5 h-5 md:w-6 md:h-6" />
               </div>
               <div>
                 <div className="text-text-muted text-xs font-medium uppercase tracking-wider mb-1">{item.label}</div>
@@ -154,7 +154,7 @@ const Footer = memo(function Footer() {
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-border pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="border-t border-border pt-6 md:pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="text-text-muted text-sm">
             &copy; {new Date().getFullYear()} HALO AI. All rights reserved.
           </div>

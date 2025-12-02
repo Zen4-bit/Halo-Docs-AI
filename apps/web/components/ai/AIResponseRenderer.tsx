@@ -19,7 +19,7 @@ interface AIResponseRendererProps {
 // Memoized code block component
 const CodeBlock = memo(({ language, children }: { language: string; children: string }) => (
   <div className="my-4 rounded-lg overflow-hidden">
-    <div className="bg-gray-800 px-4 py-2 text-xs text-gray-400 flex justify-between items-center">
+    <div className="bg-gray-800 dark:bg-gray-800 px-4 py-2 text-xs text-gray-400 flex justify-between items-center">
       <span>{language || 'code'}</span>
       <button
         onClick={() => navigator.clipboard.writeText(children)}
@@ -46,7 +46,7 @@ CodeBlock.displayName = 'CodeBlock';
 
 // Memoized inline code component
 const InlineCode = memo(({ children }: { children: React.ReactNode }) => (
-  <code className="bg-gray-800/50 text-pink-400 px-1.5 py-0.5 rounded text-sm font-mono">
+  <code className="bg-gray-200 dark:bg-gray-800/50 text-pink-600 dark:text-pink-400 px-1.5 py-0.5 rounded text-sm font-mono">
     {children}
   </code>
 ));
@@ -144,32 +144,32 @@ const AIResponseRenderer = memo(({
   const components = useMemo(() => ({
     // Headings
     h1: ({ children }: any) => (
-      <h1 className="text-2xl font-bold text-white mt-6 mb-4 first:mt-0">{children}</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-6 mb-4 first:mt-0">{children}</h1>
     ),
     h2: ({ children }: any) => (
-      <h2 className="text-xl font-bold text-white mt-5 mb-3 first:mt-0">{children}</h2>
+      <h2 className="text-xl font-bold text-gray-900 dark:text-white mt-5 mb-3 first:mt-0">{children}</h2>
     ),
     h3: ({ children }: any) => (
-      <h3 className="text-lg font-semibold text-white mt-4 mb-2 first:mt-0">{children}</h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mt-4 mb-2 first:mt-0">{children}</h3>
     ),
     h4: ({ children }: any) => (
-      <h4 className="text-base font-semibold text-gray-200 mt-3 mb-2">{children}</h4>
+      <h4 className="text-base font-semibold text-gray-700 dark:text-gray-200 mt-3 mb-2">{children}</h4>
     ),
 
     // Paragraphs
     p: ({ children }: any) => (
-      <p className="text-gray-300 leading-relaxed mb-4 last:mb-0">{children}</p>
+      <p className="text-gray-700 dark:text-gray-300 leading-relaxed mb-4 last:mb-0">{children}</p>
     ),
 
     // Lists
     ul: ({ children }: any) => (
-      <ul className="list-disc list-inside space-y-2 mb-4 text-gray-300 ml-2">{children}</ul>
+      <ul className="list-disc list-inside space-y-2 mb-4 text-gray-700 dark:text-gray-300 ml-2">{children}</ul>
     ),
     ol: ({ children }: any) => (
-      <ol className="list-decimal list-inside space-y-2 mb-4 text-gray-300 ml-2">{children}</ol>
+      <ol className="list-decimal list-inside space-y-2 mb-4 text-gray-700 dark:text-gray-300 ml-2">{children}</ol>
     ),
     li: ({ children }: any) => (
-      <li className="text-gray-300 leading-relaxed pl-1">{children}</li>
+      <li className="text-gray-700 dark:text-gray-300 leading-relaxed pl-1">{children}</li>
     ),
 
     // Code
@@ -186,7 +186,7 @@ const AIResponseRenderer = memo(({
 
     // Blockquote
     blockquote: ({ children }: any) => (
-      <blockquote className="border-l-4 border-purple-500 pl-4 my-4 text-gray-400 italic">
+      <blockquote className="border-l-4 border-purple-500 pl-4 my-4 text-gray-600 dark:text-gray-400 italic">
         {children}
       </blockquote>
     ),
@@ -197,7 +197,7 @@ const AIResponseRenderer = memo(({
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-purple-400 hover:text-purple-300 underline underline-offset-2 transition-colors"
+        className="text-purple-600 dark:text-purple-400 hover:text-purple-500 dark:hover:text-purple-300 underline underline-offset-2 transition-colors"
       >
         {children}
       </a>
@@ -206,34 +206,34 @@ const AIResponseRenderer = memo(({
     // Table
     table: ({ children }: any) => (
       <div className="overflow-x-auto my-4">
-        <table className="min-w-full border border-gray-700 rounded-lg overflow-hidden">
+        <table className="min-w-full border border-gray-300 dark:border-gray-700 rounded-lg overflow-hidden">
           {children}
         </table>
       </div>
     ),
     thead: ({ children }: any) => (
-      <thead className="bg-gray-800">{children}</thead>
+      <thead className="bg-gray-100 dark:bg-gray-800">{children}</thead>
     ),
     th: ({ children }: any) => (
-      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-200 border-b border-gray-700">
+      <th className="px-4 py-2 text-left text-sm font-semibold text-gray-800 dark:text-gray-200 border-b border-gray-300 dark:border-gray-700">
         {children}
       </th>
     ),
     td: ({ children }: any) => (
-      <td className="px-4 py-2 text-sm text-gray-300 border-b border-gray-700/50">
+      <td className="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700/50">
         {children}
       </td>
     ),
 
     // Horizontal rule
-    hr: () => <hr className="my-6 border-gray-700" />,
+    hr: () => <hr className="my-6 border-gray-300 dark:border-gray-700" />,
 
     // Strong and emphasis
     strong: ({ children }: any) => (
-      <strong className="font-semibold text-white">{children}</strong>
+      <strong className="font-semibold text-gray-900 dark:text-white">{children}</strong>
     ),
     em: ({ children }: any) => (
-      <em className="italic text-gray-200">{children}</em>
+      <em className="italic text-gray-700 dark:text-gray-200">{children}</em>
     ),
   }), []);
 

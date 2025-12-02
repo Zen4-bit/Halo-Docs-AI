@@ -19,11 +19,19 @@ router = APIRouter(prefix="/split-pdf", tags=["PDF Tools"])
 @router.post("")
 async def split_pdf(
     file: UploadFile = File(..., description="PDF file to split"),
-    mode: str = Form("pages", description="Split mode: 'pages', 'ranges', or 'every_n'"),
-    pages: Optional[str] = Form(None, description="Comma-separated page numbers (for 'pages' mode)"),
-    ranges: Optional[str] = Form(None, description="Page ranges as JSON array [[start, end], ...]"),
-    every_n: Optional[int] = Form(None, description="Split every N pages (for 'every_n' mode)"),
-    preserve_metadata: bool = Form(True, description="Preserve metadata in output files")
+    # Split mode
+    splitMode: str = Form("pages", description="Split mode: pages, ranges, every_n, size"),
+    # Mode-specific options
+    pageNumbers: str = Form("", description="Page numbers for 'pages' mode, e.g. 1,3,5"),
+    pageRanges: str = Form("", description="Page ranges for 'ranges' mode, e.g. 1-5,8-10"),
+    everyN: int = Form(1, description="Split every N pages"),
+    maxSizeMB: float = Form(10.0, description="Max file size in MB for 'size' mode"),
+    # Output options
+    preserveMetadata: bool = Form(True, description="Preserve metadata"),
+    preserveBookmarks: bool = Form(True, description="Preserve bookmarks"),
+    filenamePattern: str = Form("split_{n}", description="Output filename pattern"),
+    # Optimization
+    compressOutput: bool = Form(False, description="Compress split files")
 ):
     """
     Split PDF into multiple files
@@ -56,29 +64,45 @@ async def split_pdf(
         output_dir = temp_manager.create_temp_dir(prefix="split_")
         
         # Parse options based on mode
-        options = {'mode': mode, 'preserve_metadata': preserve_metadata}
+        options = {
+            'mode': splitMode,
+            'preserve_metadata': preserveMetadata,
+            'preserve_bookmarks': preserveBookmarks,
+            'filename_pattern': filenamePattern,
+            'compress_output': compressOutput
+        }
         
-        if mode == 'pages':
-            if not pages:
-                raise HTTPException(status_code=400, detail="'pages' parameter required for 'pages' mode")
-            # Parse comma-separated page numbers
-            page_list = [int(p.strip()) - 1 for p in pages.split(',')]  # Convert to 0-indexed
+        if splitMode == 'pages':
+            if not pageNumbers:
+                raise HTTPException(status_code=400, detail="'pageNumbers' parameter required for 'pages' mode")
+            page_list = [int(p.strip()) - 1 for p in pageNumbers.split(',')]
             options['pages'] = page_list
         
-        elif mode == 'ranges':
-            if not ranges:
-                raise HTTPException(status_code=400, detail="'ranges' parameter required for 'ranges' mode")
-            # Parse JSON ranges
-            range_list = json.loads(ranges)
+        elif splitMode == 'ranges':
+            if not pageRanges:
+                raise HTTPException(status_code=400, detail="'pageRanges' parameter required for 'ranges' mode")
+            # Parse ranges like "1-5,8-10"
+            range_list = []
+            for part in pageRanges.split(','):
+                part = part.strip()
+                if '-' in part:
+                    start, end = part.split('-')
+                    range_list.append([int(start) - 1, int(end)])
+                else:
+                    pg = int(part)
+                    range_list.append([pg - 1, pg])
             options['ranges'] = range_list
         
-        elif mode == 'every_n':
-            if not every_n or every_n < 1:
-                raise HTTPException(status_code=400, detail="Valid 'every_n' parameter required")
-            options['every_n'] = every_n
+        elif splitMode == 'every_n':
+            if everyN < 1:
+                raise HTTPException(status_code=400, detail="'everyN' must be at least 1")
+            options['every_n'] = everyN
+        
+        elif splitMode == 'size':
+            options['max_size_mb'] = maxSizeMB
         
         else:
-            raise HTTPException(status_code=400, detail=f"Invalid mode: {mode}")
+            raise HTTPException(status_code=400, detail=f"Invalid mode: {splitMode}")
         
         # Split PDF
         output_files = PDFProcessor.split_pdf(input_file, output_dir, options)

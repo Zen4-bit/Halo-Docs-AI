@@ -1,16 +1,17 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { 
-  Upload, Download, Loader2, CheckCircle2, AlertCircle,
-  X, Crop, Move, Ratio, Eye, Palette
-} from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Download, CheckCircle2, Crop, Ratio, Palette, Image, HardDrive, RotateCw, FlipHorizontal, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import ToolWorkspaceLayout, { SettingsSection, SettingsToggle, SettingsButtonGroup, SettingsSlider } from '@/components/tools/ToolWorkspaceLayout';
+import FileDropzone from '@/components/tools/FileDropzone';
 
 const ASPECT_RATIOS = [
-  { id: 'free', label: 'Free', ratio: null },
-  { id: '1:1', label: 'Square', ratio: 1 },
-  { id: '16:9', label: '16:9', ratio: 16/9 },
-  { id: '4:3', label: '4:3', ratio: 4/3 },
+  { value: 'free', label: 'Free' },
+  { value: '1:1', label: '1:1' },
+  { value: '4:3', label: '4:3' },
+  { value: '16:9', label: '16:9' },
+  { value: 'custom', label: 'Custom' },
 ];
 
 export default function CropPNGPage() {
@@ -21,292 +22,155 @@ export default function CropPNGPage() {
   const [result, setResult] = useState<{ url: string; name: string; size: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   
-  const [aspectRatio, setAspectRatio] = useState<string>('free');
+  // Aspect Ratio
+  const [aspectRatio, setAspectRatio] = useState('free');
   const [cropArea, setCropArea] = useState({ x: 50, y: 50, width: 200, height: 200 });
+  // Transform
+  const [rotation, setRotation] = useState(0);
+  const [flipH, setFlipH] = useState(false);
+  const [flipV, setFlipV] = useState(false);
+  const [zoom, setZoom] = useState(100);
+  // Options
   const [preserveTransparency, setPreserveTransparency] = useState(true);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [edgeSmoothing, setEdgeSmoothing] = useState(false);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile?.type === 'image/png') {
-      setFile(droppedFile);
-      setPreview(URL.createObjectURL(droppedFile));
-      setError(null);
-    } else {
-      setError('Please upload a PNG image');
-    }
-  }, []);
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile?.type === 'image/png') {
-      setFile(selectedFile);
-      setPreview(URL.createObjectURL(selectedFile));
-      setError(null);
-    } else {
-      setError('Please upload a PNG image');
-    }
+  const handleFilesChange = (files: File[]) => {
+    const f = files[0];
+    if (f) { setFile(f); setPreview(URL.createObjectURL(f)); setError(null); setResult(null); }
+    else { setFile(null); setPreview(null); }
   };
 
-  const handleCrop = async () => {
+  const handleCrop = useCallback(async () => {
     if (!file) return;
-
-    setProcessing(true);
-    setError(null);
-    setProgress(0);
-
+    setProcessing(true); setError(null); setProgress(0);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('x', String(Math.round(cropArea.x)));
-      formData.append('y', String(Math.round(cropArea.y)));
-      formData.append('width', String(Math.round(cropArea.width)));
-      formData.append('height', String(Math.round(cropArea.height)));
-      formData.append('preserveTransparency', String(preserveTransparency));
-
-      const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 5, 90));
-      }, 100);
-
-      const response = await fetch('/api/tools/crop-png', {
-        method: 'POST',
-        body: formData,
+      console.log('Crop PNG Settings:', {
+        cropArea, aspectRatio, rotation, flipH, flipV, zoom, preserveTransparency, edgeSmoothing
       });
-
-      clearInterval(progressInterval);
+      
+      setProgress(10);
+      
+      const img = new window.Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = URL.createObjectURL(file);
+      });
+      
+      setProgress(30);
+      
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Failed to get canvas context');
+      
+      const zoomFactor = zoom / 100;
+      const cropX = Math.round(cropArea.x / zoomFactor);
+      const cropY = Math.round(cropArea.y / zoomFactor);
+      const cropW = Math.round(cropArea.width / zoomFactor);
+      const cropH = Math.round(cropArea.height / zoomFactor);
+      
+      canvas.width = cropW;
+      canvas.height = cropH;
+      
+      setProgress(50);
+      
+      // Handle transparency
+      if (!preserveTransparency) {
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      if (rotation !== 0) ctx.rotate((rotation * Math.PI) / 180);
+      ctx.scale(flipH ? -1 : 1, flipV ? -1 : 1);
+      
+      // Apply edge smoothing
+      ctx.imageSmoothingEnabled = edgeSmoothing;
+      ctx.imageSmoothingQuality = 'high';
+      
+      ctx.drawImage(img, cropX, cropY, cropW, cropH, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+      ctx.restore();
+      
+      setProgress(85);
+      
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((b) => b ? resolve(b) : reject(new Error('Failed')), 'image/png');
+      });
+      
       setProgress(100);
-
-      if (!response.ok) throw new Error('Crop failed');
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setResult({ url, name: file.name.replace('.png', '-cropped.png'), size: blob.size });
-    } catch (err: any) {
-      setError(err.message || 'Failed to crop PNG');
-    } finally {
-      setProcessing(false);
+      setResult({ url: URL.createObjectURL(blob), name: file.name.replace('.png', '-cropped.png'), size: blob.size });
+    } catch (err: any) { 
+      console.error('Crop error:', err);
+      setError(err.message || 'Failed to crop PNG'); 
     }
-  };
+    finally { setProcessing(false); }
+  }, [file, cropArea, aspectRatio, rotation, flipH, flipV, zoom, preserveTransparency, edgeSmoothing]);
 
-  const handleDownload = () => {
-    if (result) {
-      const a = document.createElement('a');
-      a.href = result.url;
-      a.download = result.name;
-      a.click();
-    }
-  };
+  const handleDownload = () => { if (result) { const a = document.createElement('a'); a.href = result.url; a.download = result.name; a.click(); } };
+  const reset = () => { setFile(null); setPreview(null); setResult(null); setError(null); setProgress(0); };
+  const formatSize = (bytes: number) => bytes < 1024 ? bytes + ' B' : bytes < 1048576 ? (bytes / 1024).toFixed(1) + ' KB' : (bytes / 1048576).toFixed(2) + ' MB';
 
-  const reset = () => {
-    setFile(null);
-    setPreview(null);
-    setResult(null);
-    setError(null);
-    setProgress(0);
-  };
-
-  const formatSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / 1048576).toFixed(2) + ' MB';
-  };
+  const settingsPanel = (
+    <>
+      <SettingsSection title="Aspect Ratio" icon={<Ratio className="w-4 h-4" />}>
+        <SettingsButtonGroup label="Ratio" options={ASPECT_RATIOS} value={aspectRatio} onChange={setAspectRatio} />
+      </SettingsSection>
+      <SettingsSection title="Transform" icon={<RotateCw className="w-4 h-4" />}>
+        <SettingsSlider label="Rotation" value={rotation} onChange={setRotation} min={-180} max={180} unit="°" />
+        <div className="mt-2 flex gap-4">
+          <SettingsToggle label="Flip H" checked={flipH} onChange={setFlipH} />
+          <SettingsToggle label="Flip V" checked={flipV} onChange={setFlipV} />
+        </div>
+        <div className="mt-2"><SettingsSlider label="Zoom" value={zoom} onChange={setZoom} min={50} max={200} unit="%" /></div>
+      </SettingsSection>
+      <SettingsSection title="Options" icon={<Palette className="w-4 h-4" />}>
+        <SettingsToggle label="Preserve transparency" description="Keep alpha channel" checked={preserveTransparency} onChange={setPreserveTransparency} />
+        <div className="mt-2"><SettingsToggle label="Edge smoothing" description="Anti-alias edges" checked={edgeSmoothing} onChange={setEdgeSmoothing} /></div>
+      </SettingsSection>
+    </>
+  );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
-      {/* Header */}
-      <div className="relative overflow-hidden border-b border-zinc-800">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-indigo-500/10" />
-        <div className="relative max-w-5xl mx-auto px-6 py-16">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-500 to-blue-500 shadow-lg shadow-cyan-500/25">
-              <Crop className="w-8 h-8 text-white" />
+    <ToolWorkspaceLayout toolName="Crop PNG" toolIcon={<Crop className="w-5 h-5 text-white" />} toolColor="from-cyan-500 to-blue-500" settingsPanel={settingsPanel}
+      actionButton={{ label: 'Crop PNG', onClick: handleCrop, disabled: !file, loading: processing, loadingText: `Cropping... ${progress}%`, icon: <Crop className="w-5 h-5" /> }}>
+      {!result ? (
+        <div className="max-w-4xl mx-auto space-y-6">
+          <FileDropzone files={file ? [file] : []} onFilesChange={handleFilesChange} accept=".png,image/png" multiple={false} title="Drop PNG here" description="or click to browse • PNG files only" icon={<Image className="w-8 h-8" />} accentColor="blue" disabled={processing} />
+          {file && preview && (
+            <div className="p-6 rounded-xl bg-white/5 border border-white/10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-white/80">Preview & Crop</h3>
+                <div className="flex items-center gap-2 text-xs text-white/40"><HardDrive className="w-3 h-3" />{formatSize(file.size)}</div>
+              </div>
+              <div className="relative aspect-video rounded-xl overflow-hidden bg-[linear-gradient(45deg,#1a1a1a_25%,transparent_25%),linear-gradient(-45deg,#1a1a1a_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#1a1a1a_75%),linear-gradient(-45deg,transparent_75%,#1a1a1a_75%)] bg-[length:20px_20px] bg-[position:0_0,0_10px,10px_-10px,-10px_0px] flex items-center justify-center">
+                <img src={preview} alt="Preview" className="max-w-full max-h-full object-contain" />
+                <div className="absolute inset-0 bg-black/50">
+                  <div className="absolute border-2 border-cyan-400 bg-transparent" style={{ left: cropArea.x, top: cropArea.y, width: cropArea.width, height: cropArea.height }}>
+                    <div className="absolute inset-0 grid grid-cols-3 grid-rows-3">{[...Array(9)].map((_, i) => <div key={i} className="border border-white/20" />)}</div>
+                  </div>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-white/40 text-center">Crop area: {Math.round(cropArea.width)} × {Math.round(cropArea.height)}px</p>
             </div>
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-              PNG TOOL
-            </span>
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-3">Crop PNG</h1>
-          <p className="text-lg text-zinc-400 max-w-2xl">
-            Crop PNG images while preserving transparency and alpha channel.
-          </p>
+          )}
+          <AnimatePresence>{error && <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</motion.div>}</AnimatePresence>
+          {processing && <div className="space-y-2"><div className="w-full h-2 bg-white/10 rounded-full overflow-hidden"><motion.div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500" initial={{ width: 0 }} animate={{ width: `${progress}%` }} /></div><p className="text-xs text-white/40 text-center">Cropping...</p></div>}
         </div>
-      </div>
-
-      <main className="max-w-5xl mx-auto px-6 py-12">
-        {!result ? (
-          <div className="space-y-8">
-            {!file ? (
-              <div
-                onDrop={handleDrop}
-                onDragOver={(e) => e.preventDefault()}
-                className="relative border-2 border-dashed border-zinc-700 hover:border-cyan-500/50 rounded-2xl p-12 transition-all duration-300 bg-zinc-900/30 hover:bg-cyan-500/5 group"
-              >
-                <input
-                  type="file"
-                  accept=".png"
-                  onChange={handleFileInput}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <div className="text-center">
-                  <div className="inline-flex p-4 rounded-2xl bg-zinc-800/50 group-hover:bg-cyan-500/20 transition-colors mb-4">
-                    <Upload className="w-10 h-10 text-zinc-400 group-hover:text-cyan-400 transition-colors" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Drop your PNG here</h3>
-                  <p className="text-zinc-500">or click to browse</p>
-                  <span className="mt-4 inline-block px-3 py-1 rounded-full text-xs bg-cyan-500/20 text-cyan-400">.PNG</span>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2 text-sm text-zinc-400">
-                      <Eye className="w-4 h-4" />
-                      Preview (Transparency preserved)
-                    </div>
-                    <button onClick={reset} className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10">
-                      <X className="w-5 h-5" />
-                    </button>
-                  </div>
-                  
-                  <div 
-                    ref={containerRef}
-                    className="relative aspect-video rounded-xl overflow-hidden bg-[url('/checkerboard.svg')] bg-repeat bg-[length:20px_20px] flex items-center justify-center"
-                  >
-                    {preview && <img src={preview} alt="Preview" className="max-w-full max-h-full object-contain" />}
-                    <div className="absolute inset-0 bg-black/50">
-                      <div
-                        className="absolute border-2 border-cyan-400 bg-transparent shadow-lg"
-                        style={{
-                          left: cropArea.x,
-                          top: cropArea.y,
-                          width: cropArea.width,
-                          height: cropArea.height,
-                        }}
-                      >
-                        <div className="absolute inset-0 grid grid-cols-3 grid-rows-3">
-                          {[...Array(9)].map((_, i) => (
-                            <div key={i} className="border border-white/20" />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 flex items-center justify-center gap-4 text-sm text-zinc-400">
-                    <span>Selection: {Math.round(cropArea.width)} × {Math.round(cropArea.height)}px</span>
-                  </div>
-                </div>
-
-                <div className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800">
-                  <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-                    <Ratio className="w-5 h-5 text-amber-400" />
-                    Aspect Ratio
-                  </h3>
-                  <div className="grid grid-cols-4 gap-3">
-                    {ASPECT_RATIOS.map(ratio => (
-                      <button
-                        key={ratio.id}
-                        onClick={() => {
-                          setAspectRatio(ratio.id);
-                          if (ratio.ratio) {
-                            setCropArea(prev => ({ ...prev, height: prev.width / ratio.ratio! }));
-                          }
-                        }}
-                        className={`p-3 rounded-xl border text-center transition-all ${
-                          aspectRatio === ratio.id
-                            ? 'bg-cyan-500/20 border-cyan-500/50 text-white'
-                            : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:border-zinc-600'
-                        }`}
-                      >
-                        <span className="text-sm font-medium">{ratio.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-3 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={preserveTransparency}
-                    onChange={(e) => setPreserveTransparency(e.target.checked)}
-                    className="w-5 h-5 rounded border-zinc-600 text-cyan-500 focus:ring-cyan-500/20"
-                  />
-                  <div>
-                    <p className="text-white font-medium flex items-center gap-2">
-                      <Palette className="w-4 h-4 text-cyan-400" />
-                      Preserve Transparency
-                    </p>
-                    <p className="text-sm text-zinc-500">Keep alpha channel in cropped image</p>
-                  </div>
-                </label>
-              </>
-            )}
-
-            {error && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p>{error}</p>
-              </div>
-            )}
-
-            {file && (
-              <button
-                onClick={handleCrop}
-                disabled={processing}
-                className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-3 ${
-                  processing
-                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white hover:shadow-lg hover:shadow-cyan-500/25 hover:scale-[1.02] active:scale-[0.98]'
-                }`}
-              >
-                {processing ? (
-                  <>
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                    Cropping... {progress}%
-                  </>
-                ) : (
-                  <>
-                    <Crop className="w-6 h-6" />
-                    Crop PNG
-                  </>
-                )}
-              </button>
-            )}
-
-            {processing && (
-              <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-300" style={{ width: `${progress}%` }} />
-              </div>
-            )}
+      ) : (
+        <div className="max-w-2xl mx-auto space-y-6">
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-center py-8">
+            <div className="inline-flex p-6 rounded-3xl bg-green-500/20 mb-6"><CheckCircle2 className="w-16 h-16 text-green-400" /></div>
+            <h2 className="text-2xl font-bold text-white mb-2">PNG Cropped!</h2>
+            <p className="text-white/60">{result.name} • {formatSize(result.size)}</p>
+          </motion.div>
+          <div className="p-4 rounded-xl bg-white/5 border border-white/10"><img src={result.url} alt="Cropped" className="max-w-full mx-auto rounded-lg" /></div>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button onClick={handleDownload} className="px-8 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold hover:shadow-lg hover:shadow-green-500/25 transition-all inline-flex items-center justify-center gap-2"><Download className="w-5 h-5" />Download PNG</button>
+            <button onClick={reset} className="px-8 py-4 rounded-xl bg-white/5 text-white/70 font-semibold hover:bg-white/10 transition-colors">Crop Another</button>
           </div>
-        ) : (
-          <div className="space-y-8">
-            <div className="text-center py-8">
-              <div className="inline-flex p-6 rounded-3xl bg-green-500/20 mb-6">
-                <CheckCircle2 className="w-16 h-16 text-green-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">PNG Cropped!</h2>
-              <p className="text-zinc-400">{result.name} • {formatSize(result.size)}</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800 bg-[url('/checkerboard.svg')] bg-repeat bg-[length:20px_20px]">
-              <img src={result.url} alt="Cropped" className="max-w-full mx-auto rounded-lg" />
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button onClick={handleDownload} className="px-8 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold hover:shadow-lg hover:shadow-green-500/25 transition-all inline-flex items-center justify-center gap-2">
-                <Download className="w-5 h-5" />
-                Download Cropped PNG
-              </button>
-              <button onClick={reset} className="px-8 py-4 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700 transition-colors">
-                Crop Another PNG
-              </button>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
+        </div>
+      )}
+    </ToolWorkspaceLayout>
   );
 }

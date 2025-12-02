@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   Sparkles, Loader2, Copy, Check, Upload, X, FileText,
   Settings2, ChevronDown, Download, Smile, ArrowDownWideNarrow, ArrowUpWideNarrow, Shield
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AIResponseRenderer from '@/components/ai/AIResponseRenderer';
+import { useAIHistory } from '@/context/AIHistoryContext';
 
 const LEVELS = [
   { id: 'light', label: 'Light', description: 'Minimal changes', icon: '✨' },
@@ -45,6 +46,46 @@ export default function RewriterPage() {
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Shared history context
+  const { updateCurrentSession, selectedItemData, isNewChat } = useAIHistory();
+  
+  // Restore session when a history item is selected
+  useEffect(() => {
+    if (selectedItemData) {
+      try {
+        if (selectedItemData.text) setText(selectedItemData.text);
+        if (selectedItemData.level) setLevel(selectedItemData.level);
+        if (selectedItemData.tone) setTone(selectedItemData.tone);
+        if (selectedItemData.rewrittenText) setRewrittenText(selectedItemData.rewrittenText);
+      } catch (error) {
+        console.error('Error restoring rewriter session:', error);
+      }
+    }
+  }, [selectedItemData]);
+  
+  // Handle new chat action
+  useEffect(() => {
+    if (isNewChat) {
+      setText('');
+      setLevel('medium');
+      setTone('neutral');
+      setRewrittenText('');
+      setError('');
+      setAttachedFile(null);
+    }
+  }, [isNewChat]);
+  
+  // Save to history when rewrite is complete
+  useEffect(() => {
+    if (rewrittenText && !loading) {
+      updateCurrentSession(
+        text.slice(0, 50) + (text.length > 50 ? '...' : ''),
+        { text, level, tone, rewrittenText },
+        rewrittenText.slice(0, 100)
+      );
+    }
+  }, [rewrittenText, loading, updateCurrentSession]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -119,44 +160,30 @@ export default function RewriterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
-      {/* Header */}
-      <div className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-xl">
-        <div className="max-w-5xl mx-auto px-6 py-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-500 shadow-lg shadow-violet-500/25">
-              <Sparkles className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">AI Rewriter</h1>
-              <p className="text-zinc-400">Rephrase with multiple tones, levels & plagiarism-safe mode</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+    <div className="flex flex-col h-full pt-12 md:pt-0">
+      <main className="flex-1 overflow-y-auto min-h-0">
+        <div className="max-w-[850px] mx-auto px-3 sm:px-4 py-4 space-y-4">
         {/* Upload Zone */}
-        <div onClick={() => fileInputRef.current?.click()} className="relative border-2 border-dashed border-zinc-700 hover:border-violet-500/50 rounded-2xl p-6 transition-all cursor-pointer bg-zinc-900/30 hover:bg-violet-500/5 group">
+        <div onClick={() => fileInputRef.current?.click()} className="tool-upload-zone cursor-pointer hover:border-violet-500/50 hover:bg-violet-500/5 group">
           <input ref={fileInputRef} type="file" accept=".txt,.doc,.docx" onChange={handleFileSelect} className="hidden" />
           
           {attachedFile ? (
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-xl bg-zinc-800 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-xl tool-bg-highlight flex items-center justify-center">
                 <FileText className="w-7 h-7 text-violet-400" />
               </div>
               <div className="flex-1">
-                <p className="text-white font-medium">{attachedFile.name}</p>
-                <p className="text-sm text-zinc-400">{(attachedFile.size / 1024).toFixed(1)} KB</p>
+                <p className="tool-text font-medium">{attachedFile.name}</p>
+                <p className="text-sm tool-text-secondary">{(attachedFile.size / 1024).toFixed(1)} KB</p>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); removeFile(); }} className="p-2 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-red-400">
+              <button onClick={(e) => { e.stopPropagation(); removeFile(); }} className="p-2 rounded-lg hover:tool-bg-highlight tool-text-muted hover:text-red-400">
                 <X className="w-5 h-5" />
               </button>
             </div>
           ) : (
             <div className="text-center">
-              <Upload className="w-10 h-10 text-zinc-500 group-hover:text-violet-400 mx-auto mb-2 transition-colors" />
-              <p className="text-white font-medium">Upload a document to rewrite</p>
+              <Upload className="w-10 h-10 tool-text-muted group-hover:text-violet-400 mx-auto mb-2 transition-colors" />
+              <p className="tool-text font-medium">Upload a document to rewrite</p>
               <p className="text-sm text-zinc-500">TXT, DOC, DOCX supported</p>
             </div>
           )}
@@ -164,13 +191,13 @@ export default function RewriterPage() {
 
         {/* Rewrite Level */}
         <div>
-          <label className="text-sm font-medium text-zinc-300 mb-3 block">Rewrite Level</label>
+          <label className="text-sm font-medium tool-text-secondary mb-3 block">Rewrite Level</label>
           <div className="grid grid-cols-3 gap-3">
             {LEVELS.map(l => (
-              <button key={l.id} onClick={() => setLevel(l.id)} className={`p-4 rounded-xl border text-center transition-all ${level === l.id ? 'bg-violet-500/20 border-violet-500/50 text-white' : 'bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:border-zinc-600'}`}>
+              <button key={l.id} onClick={() => setLevel(l.id)} className={`p-4 rounded-xl border text-center transition-all ${level === l.id ? 'bg-violet-500/20 border-violet-500/50 tool-text' : 'tool-bg-surface tool-border tool-text-secondary hover:border-violet-500/30'}`}>
                 <span className="text-2xl">{l.icon}</span>
                 <p className="font-medium mt-1">{l.label}</p>
-                <p className="text-xs text-zinc-500 mt-1">{l.description}</p>
+                <p className="text-xs tool-text-muted mt-1">{l.description}</p>
               </button>
             ))}
           </div>
@@ -178,10 +205,10 @@ export default function RewriterPage() {
 
         {/* Tone Selection */}
         <div>
-          <label className="text-sm font-medium text-zinc-300 mb-3 block">Tone Style</label>
+          <label className="text-sm font-medium tool-text-secondary mb-3 block">Tone Style</label>
           <div className="grid grid-cols-4 md:grid-cols-7 gap-2">
             {TONES.map(t => (
-              <button key={t.id} onClick={() => setTone(t.id)} className={`p-3 rounded-xl border text-center transition-all ${tone === t.id ? 'bg-violet-500/20 border-violet-500/50 text-white' : 'bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:border-zinc-600'}`}>
+              <button key={t.id} onClick={() => setTone(t.id)} className={`p-3 rounded-xl border text-center transition-all ${tone === t.id ? 'bg-violet-500/20 border-violet-500/50 tool-text' : 'tool-bg-surface tool-border tool-text-secondary hover:border-violet-500/30'}`}>
                 <span className="text-lg">{t.icon}</span>
                 <p className="text-xs mt-1">{t.label}</p>
               </button>
@@ -191,12 +218,12 @@ export default function RewriterPage() {
 
         {/* Length Control */}
         <div>
-          <label className="text-sm font-medium text-zinc-300 mb-3 block">Output Length</label>
+          <label className="text-sm font-medium tool-text-secondary mb-3 block">Output Length</label>
           <div className="grid grid-cols-3 gap-3">
             {LENGTH_OPTIONS.map(opt => {
               const Icon = opt.icon;
               return (
-                <button key={opt.id} onClick={() => setLengthChange(opt.id)} className={`p-3 rounded-xl border flex items-center justify-center gap-2 transition-all ${lengthChange === opt.id ? 'bg-violet-500/20 border-violet-500/50 text-white' : 'bg-zinc-800/50 border-zinc-700 text-zinc-400 hover:border-zinc-600'}`}>
+                <button key={opt.id} onClick={() => setLengthChange(opt.id)} className={`p-3 rounded-xl border flex items-center justify-center gap-2 transition-all ${lengthChange === opt.id ? 'bg-violet-500/20 border-violet-500/50 tool-text' : 'tool-bg-surface tool-border tool-text-secondary hover:border-violet-500/30'}`}>
                   {Icon && <Icon className="w-5 h-5" />}
                   <span className="font-medium">{opt.label}</span>
                 </button>
@@ -206,23 +233,23 @@ export default function RewriterPage() {
         </div>
 
         {/* Advanced Options */}
-        <div className="p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800">
-          <button onClick={() => setShowOptions(!showOptions)} className="w-full flex items-center justify-between text-white">
+        <div className="p-4 rounded-2xl tool-bg-surface tool-border border">
+          <button onClick={() => setShowOptions(!showOptions)} className="w-full flex items-center justify-between tool-text">
             <span className="flex items-center gap-2 font-medium"><Settings2 className="w-5 h-5 text-violet-400" /> Advanced Options</span>
             <ChevronDown className={`w-5 h-5 transition-transform ${showOptions ? 'rotate-180' : ''}`} />
           </button>
           
           {showOptions && (
-            <div className="mt-4 pt-4 border-t border-zinc-800 flex flex-wrap gap-4">
-              <label className="flex items-center gap-3 p-3 rounded-xl bg-zinc-800/50 cursor-pointer">
+            <div className="mt-4 pt-4 tool-border border-t flex flex-wrap gap-4">
+              <label className="flex items-center gap-3 p-3 rounded-xl tool-bg-highlight cursor-pointer">
                 <input type="checkbox" checked={useEmoji} onChange={(e) => setUseEmoji(e.target.checked)} className="w-4 h-4 rounded accent-violet-500" />
                 <Smile className="w-5 h-5 text-yellow-400" />
-                <span className="text-sm text-zinc-300">Add Emojis</span>
+                <span className="text-sm tool-text-secondary">Add Emojis</span>
               </label>
-              <label className="flex items-center gap-3 p-3 rounded-xl bg-zinc-800/50 cursor-pointer">
+              <label className="flex items-center gap-3 p-3 rounded-xl tool-bg-highlight cursor-pointer">
                 <input type="checkbox" checked={plagiarismSafe} onChange={(e) => setPlagiarismSafe(e.target.checked)} className="w-4 h-4 rounded accent-violet-500" />
                 <Shield className="w-5 h-5 text-green-400" />
-                <span className="text-sm text-zinc-300">Plagiarism-Safe</span>
+                <span className="text-sm tool-text-secondary">Plagiarism-Safe</span>
               </label>
             </div>
           )}
@@ -232,13 +259,13 @@ export default function RewriterPage() {
         <div className="grid md:grid-cols-2 gap-6">
           {/* Input */}
           <div>
-            <label className="text-sm font-medium text-zinc-300 mb-2 block">Original Text</label>
+            <label className="text-sm font-medium tool-text-secondary mb-2 block">Original Text</label>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Enter or paste text to rewrite..."
               rows={10}
-              className="w-full px-4 py-3 rounded-xl bg-zinc-900/50 border border-zinc-800 text-white placeholder-zinc-500 focus:border-violet-500 focus:outline-none resize-none"
+              className="tool-input w-full px-4 py-3 rounded-xl focus:border-violet-500 resize-none"
             />
             <div className="mt-2 text-xs text-zinc-500 text-right">{text.length.toLocaleString()} characters</div>
           </div>
@@ -303,16 +330,21 @@ export default function RewriterPage() {
 
         {/* Error */}
         {error && <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400">{error}</div>}
-
-        {/* Rewrite Button */}
-        <button
-          onClick={handleRewrite}
-          disabled={loading || (!text.trim() && !attachedFile)}
-          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-violet-500 to-purple-500 text-white font-semibold hover:shadow-lg hover:shadow-violet-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all"
-        >
-          {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Rewriting...</> : <><Sparkles className="w-5 h-5" />Rewrite Text</>}
-        </button>
+        </div>
       </main>
+
+      {/* Rewrite Button - Fixed at bottom */}
+      <div className="flex-shrink-0 border-t border-border bg-surface/95 backdrop-blur-xl">
+        <div className="max-w-[850px] mx-auto px-4 py-2">
+          <button
+            onClick={handleRewrite}
+            disabled={loading || (!text.trim() && !attachedFile)}
+            className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-violet-500 to-purple-500 text-white font-semibold hover:shadow-lg hover:shadow-violet-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all"
+          >
+            {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Rewriting...</> : <><Sparkles className="w-5 h-5" />Rewrite Text</>}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

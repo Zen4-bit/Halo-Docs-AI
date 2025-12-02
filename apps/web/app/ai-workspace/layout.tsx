@@ -1,28 +1,38 @@
-import { ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
+'use client';
+
+import { usePathname } from 'next/navigation';
+import { AISidebar } from '@/components/AISidebar';
+import { AIHistoryProvider } from '@/context/AIHistoryContext';
+import { ToastProvider } from '@/components/Toast';
 
 export default function AIWorkspaceLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-            {/* Back Button */}
-            <div className="border-b border-slate-800">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-                    <Link
-                        href="/ai-workspace"
-                        className="inline-flex items-center gap-2 text-slate-400 hover:text-white transition-colors"
-                    >
-                        <ArrowLeft className="w-4 h-4" />
-                        <span className="text-sm font-medium">Back to AI Workspace</span>
-                    </Link>
-                </div>
-            </div>
+    const pathname = usePathname();
+    const isMainPage = pathname === '/ai-workspace';
 
-            {/* Main Content */}
-            {children}
-        </div>
+    // Main AI workspace page - no sidebar, normal layout with header
+    if (isMainPage) {
+        return (
+            <div className="tool-page min-h-screen">
+                {children}
+            </div>
+        );
+    }
+
+    // Tool pages - full viewport height (no header), with sidebar
+    return (
+        <AIHistoryProvider>
+            <ToastProvider>
+                <div className="tool-page h-screen flex overflow-hidden">
+                    <AISidebar />
+                    <main className="flex-1 flex flex-col min-h-0 w-full overflow-hidden">
+                        {children}
+                    </main>
+                </div>
+            </ToastProvider>
+        </AIHistoryProvider>
     );
 }

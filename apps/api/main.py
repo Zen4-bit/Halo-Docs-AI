@@ -33,15 +33,32 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Configure CORS
-cors_origins = os.getenv(
-    "CORS_ORIGINS", 
-    "http://localhost:3000,http://127.0.0.1:3000,http://host.docker.internal:3000"
-).split(",")
+# Configure CORS for local and Cloud Run deployments
+cors_origins_env = os.getenv("CORS_ORIGINS", "")
+
+# Parse CORS origins - support wildcard for Cloud Run
+if cors_origins_env == "*":
+    cors_origins = ["*"]
+elif cors_origins_env:
+    cors_origins = [origin.strip() for origin in cors_origins_env.split(",") if origin.strip()]
+else:
+    # Default origins for development
+    cors_origins = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://host.docker.internal:3000",
+    ]
+
+# Add Cloud Run domain pattern
+cors_origins.extend([
+    "https://*.run.app",
+    "https://*.a.run.app",
+])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=cors_origins if "*" not in cors_origins else ["*"],
+    allow_origin_regex=r"https://.*\.run\.app" if "*" not in cors_origins else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

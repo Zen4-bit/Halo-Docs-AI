@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   Image, Wand2, Loader2, Download, RefreshCw, Upload, X, Sparkles,
   Palette, Eye, Zap, Settings2, Copy, Check, ImagePlus, Eraser, ZoomIn,
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AIResponseRenderer from '@/components/ai/AIResponseRenderer';
+import { useAIHistory } from '@/context/AIHistoryContext';
 
 const STYLES = [
   { id: 'realistic', label: 'Realistic', icon: '📸', description: 'Photorealistic quality' },
@@ -51,6 +52,49 @@ export default function ImageStudioPage() {
   const [enhanceBeforeGenerate, setEnhanceBeforeGenerate] = useState(true);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Shared history context
+  const { updateCurrentSession, selectedItemData, isNewChat } = useAIHistory();
+  
+  // Restore session when a history item is selected
+  useEffect(() => {
+    if (selectedItemData) {
+      try {
+        if (selectedItemData.prompt) setPrompt(selectedItemData.prompt);
+        if (selectedItemData.style) setStyle(selectedItemData.style);
+        if (selectedItemData.enhancedPrompt) setEnhancedPrompt(selectedItemData.enhancedPrompt);
+        if (selectedItemData.analysis) setAnalysis(selectedItemData.analysis);
+        if (selectedItemData.generatedImage) setGeneratedImage(selectedItemData.generatedImage);
+      } catch (error) {
+        console.error('Error restoring image studio session:', error);
+      }
+    }
+  }, [selectedItemData]);
+  
+  // Handle new chat action
+  useEffect(() => {
+    if (isNewChat) {
+      setPrompt('');
+      setStyle('realistic');
+      setEnhancedPrompt('');
+      setAnalysis('');
+      setGeneratedImage(null);
+      setError('');
+      setUploadedImage(null);
+      setImagePreview(null);
+    }
+  }, [isNewChat]);
+  
+  // Save to history when generation/analysis is complete
+  useEffect(() => {
+    if ((generatedImage || analysis || enhancedPrompt) && !loading) {
+      updateCurrentSession(
+        prompt.slice(0, 50) + (prompt.length > 50 ? '...' : ''),
+        { prompt, style, enhancedPrompt, analysis, generatedImage },
+        (analysis || enhancedPrompt || 'Generated image').slice(0, 100)
+      );
+    }
+  }, [generatedImage, analysis, enhancedPrompt, loading, updateCurrentSession]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -227,27 +271,13 @@ export default function ImageStudioPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
-      {/* Header */}
-      <div className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-xl">
-        <div className="max-w-5xl mx-auto px-6 py-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-orange-500 to-red-500 shadow-lg shadow-orange-500/25">
-              <Image className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">AI Image Studio</h1>
-              <p className="text-zinc-400">Analyze, enhance prompts & generate variations with Gemini Vision</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+    <div className="flex flex-col h-full pt-12 md:pt-0">
+      <main className="flex-1 overflow-y-auto min-h-0">
+        <div className="max-w-[850px] mx-auto px-3 sm:px-4 py-4 space-y-4">
         {/* Upload Zone */}
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="relative border-2 border-dashed border-zinc-700 hover:border-orange-500/50 rounded-2xl p-8 transition-all cursor-pointer bg-zinc-900/30 hover:bg-orange-500/5 group"
+          className="tool-upload-zone cursor-pointer hover:border-orange-500/50 hover:bg-orange-500/5 group"
         >
           <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
           
@@ -255,19 +285,19 @@ export default function ImageStudioPage() {
             <div className="flex items-center gap-6">
               <img src={imagePreview} alt="Preview" className="w-32 h-32 rounded-xl object-cover" />
               <div className="flex-1">
-                <p className="text-white font-medium">{uploadedImage?.name}</p>
-                <p className="text-sm text-zinc-400">{uploadedImage && (uploadedImage.size / 1024).toFixed(1)} KB</p>
+                <p className="tool-text font-medium">{uploadedImage?.name}</p>
+                <p className="text-sm tool-text-secondary">{uploadedImage && (uploadedImage.size / 1024).toFixed(1)} KB</p>
                 <p className="text-xs text-orange-400 mt-2">Click features below to analyze or create variations</p>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); removeImage(); }} className="p-2 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-red-400">
+              <button onClick={(e) => { e.stopPropagation(); removeImage(); }} className="p-2 rounded-lg hover:tool-bg-highlight tool-text-muted hover:text-red-400">
                 <X className="w-5 h-5" />
               </button>
             </div>
           ) : (
             <div className="text-center">
-              <Upload className="w-12 h-12 text-zinc-500 group-hover:text-orange-400 mx-auto mb-3 transition-colors" />
-              <p className="text-white font-medium mb-1">Drop an image to analyze or create variations</p>
-              <p className="text-sm text-zinc-500">PNG, JPG, WebP supported</p>
+              <Upload className="w-12 h-12 tool-text-muted group-hover:text-orange-400 mx-auto mb-3 transition-colors" />
+              <p className="tool-text font-medium mb-1">Drop an image to analyze or create variations</p>
+              <p className="text-sm tool-text-muted">PNG, JPG, WebP supported</p>
             </div>
           )}
         </div>
@@ -492,7 +522,21 @@ export default function ImageStudioPage() {
             <p className="text-sm text-zinc-500">Gemini will create images from text and help you enhance your prompts</p>
           </div>
         )}
+        </div>
       </main>
+
+      {/* Generate Button - Fixed at bottom */}
+      <div className="flex-shrink-0 border-t border-border bg-surface/95 backdrop-blur-xl">
+        <div className="max-w-[850px] mx-auto px-4 py-2">
+          <button
+            onClick={handleGenerateImage}
+            disabled={loading || !prompt.trim()}
+            className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white font-semibold hover:shadow-lg hover:shadow-orange-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all"
+          >
+            {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Generating...</> : <><Wand2 className="w-5 h-5" />Generate Image</>}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

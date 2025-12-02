@@ -5,6 +5,9 @@ const apiBase = (process.env.NEXT_PUBLIC_API_BASE || DEFAULT_API_BASE).replace(/
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Enable standalone output for Cloud Run deployment
+  output: 'standalone',
+  
   reactStrictMode: false, // Disable strict mode to prevent React 19 issues
   eslint: {
     ignoreDuringBuilds: true, // Disable ESLint during builds for now
@@ -94,8 +97,15 @@ const nextConfig = {
         'fs': false,
         'path': false,
         'crypto': false,
+        'canvas': false,  // Required for pdfjs-dist browser usage
       };
     }
+
+    // Ignore canvas module for pdfjs-dist
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      canvas: false,
+    };
 
     return config;
   },

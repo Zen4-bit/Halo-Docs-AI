@@ -15,9 +15,16 @@ router = APIRouter(prefix="/webp-compressor", tags=["Media Tools"])
 @router.post("")
 async def compress_webp(
     file: UploadFile = File(..., description="WebP file to compress"),
-    quality: int = Form(85, description="Compression quality (1-100)"),
-    strip_metadata: bool = Form(True, description="Remove metadata"),
+    quality: int = Form(80, description="Compression quality (1-100)"),
+    targetSize: int = Form(0, description="Target file size in KB (0 = ignore)"),
+    resizePercent: int = Form(100, description="Resize percentage (10-200)"),
     lossless: bool = Form(False, description="Use lossless compression"),
+    preserveTransparency: bool = Form(True, description="Preserve transparency"),
+    stripMetadata: bool = Form(True, description="Remove metadata"),
+    keepAnimation: bool = Form(True, description="Keep animation frames"),
+    reduceFrames: bool = Form(False, description="Reduce animation frames"),
+    frameSkip: int = Form(2, description="Keep every Nth frame if reducing"),
+    autoEnhance: bool = Form(False, description="Auto enhance image"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -58,36 +65,56 @@ async def compress_webp(
         # Create output file
         output_file = temp_manager.create_temp_file(suffix="_compressed.webp")
         
-        # Compress WebP
-        from PIL import Image
+        # Compress WebP with all options
+        from PIL import Image, ImageOps, ImageEnhance
         
         with Image.open(input_file) as img:
+            # Resize if needed
+            if resizePercent != 100:
+                new_width = int(img.width * resizePercent / 100)
+                new_height = int(img.height * resizePercent / 100)
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            
+            # Auto enhance
+            if autoEnhance:
+                img = ImageOps.autocontrast(img)
+            
             # Preserve transparency if present
-            if img.mode in ('RGBA', 'LA', 'PA'):
-                # Keep alpha channel
+            if preserveTransparency and img.mode in ('RGBA', 'LA', 'PA'):
                 pass
-            elif img.mode == 'P':
-                # Convert palette to RGBA if has transparency
-                if 'transparency' in img.info:
-                    img = img.convert('RGBA')
+            elif img.mode == 'P' and 'transparency' in img.info:
+                img = img.convert('RGBA')
             
             # Save with compression
             save_kwargs = {
                 'quality': quality,
-                'method': 6,  # Best compression method
+                'method': 6,
             }
             
             if lossless:
                 save_kwargs['lossless'] = True
             
-            if strip_metadata:
-                # Remove EXIF by creating new image
+            if stripMetadata:
                 data = list(img.getdata())
                 img_clean = Image.new(img.mode, img.size)
                 img_clean.putdata(data)
                 img_clean.save(output_file, 'WEBP', **save_kwargs)
             else:
                 img.save(output_file, 'WEBP', **save_kwargs)
+        
+        # If target size is set, iteratively compress
+        if targetSize > 0:
+            target_bytes = targetSize * 1024
+            current_quality = quality
+            while output_file.stat().st_size > target_bytes and current_quality > 10:
+                current_quality -= 10
+                save_kwargs['quality'] = current_quality
+                with Image.open(input_file) as img:
+                    if resizePercent != 100:
+                        new_width = int(img.width * resizePercent / 100)
+                        new_height = int(img.height * resizePercent / 100)
+                        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                    img.save(output_file, 'WEBP', **save_kwargs)
         
         # Calculate compression
         compressed_size = output_file.stat().st_size

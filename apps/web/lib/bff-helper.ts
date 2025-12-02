@@ -3,17 +3,19 @@
  * Provides reusable functions for proxying requests to FastAPI backend
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { buildApiUrl } from './api-base';
+import { buildApiUrl, API_BASE } from './api-base';
 
-// Direct backend URL without /api/v1 prefix for tools
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_BASE?.replace(/\/api\/v1$/, '') || 'http://localhost:8080';
+// Direct backend URL - use API_BASE for consistent URL construction
+const BACKEND_BASE = process.env.NEXT_PUBLIC_API_BASE || 'http://localhost:8080/api/v1';
 
 /**
- * Build URL for tools endpoints (without /api/v1 prefix)
+ * Build URL for tools endpoints
+ * Tools endpoints are under the /api/v1 prefix
  */
 export function buildToolsUrl(endpoint: string): string {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
-  return `${BACKEND_URL}${cleanEndpoint}`;
+  // Use the full API base for tools
+  return `${BACKEND_BASE.replace(/\/$/, '')}${cleanEndpoint}`;
 }
 
 /**
@@ -204,20 +206,49 @@ export async function proxyFormData(
     const backendUrl = buildToolsUrl(toolEndpoint);
     
     console.log('🔧 Tool request to:', backendUrl);
+    console.log('🔧 Tool endpoint:', toolEndpoint);
     
-    const response = await fetch(backendUrl, {
-      method: 'POST',
-      body: formData,
-    });
+    // Set timeout for the request
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minute timeout
+    
+    let response: Response;
+    try {
+      response = await fetch(backendUrl, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
+    } catch (fetchError: any) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        return NextResponse.json(
+          { error: 'Request timed out. The file may be too large or the server is busy.' },
+          { status: 504 }
+        );
+      }
+      // Connection refused or network error
+      console.error('🔧 Backend connection error:', fetchError.message);
+      return NextResponse.json(
+        { error: `Backend service unavailable. Please ensure the backend server is running. (${fetchError.message})` },
+        { status: 503 }
+      );
+    }
+    clearTimeout(timeoutId);
     
     if (!response.ok) {
       let errorDetail = 'Processing failed';
       try {
         const errorData = await response.json();
-        errorDetail = errorData.detail || errorData.error || errorDetail;
+        errorDetail = errorData.detail || errorData.error || errorData.message || errorDetail;
       } catch {
-        errorDetail = await response.text() || errorDetail;
+        try {
+          errorDetail = await response.text() || errorDetail;
+        } catch {
+          errorDetail = `Server returned status ${response.status}`;
+        }
       }
+      console.error('🔧 Backend error:', errorDetail);
       return NextResponse.json(
         { error: errorDetail },
         { status: response.status }
@@ -229,6 +260,8 @@ export async function proxyFormData(
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     const contentDisposition = response.headers.get('content-disposition');
     
+    console.log('🔧 Tool response received:', blob.size, 'bytes');
+    
     // Create response with file
     const fileResponse = new NextResponse(blob, {
       status: 200,
@@ -239,10 +272,10 @@ export async function proxyFormData(
     });
     
     return fileResponse;
-  } catch (error) {
-    console.error(`Tool proxy error for ${toolEndpoint}:`, error);
+  } catch (error: any) {
+    console.error(`🔧 Tool proxy error for ${toolEndpoint}:`, error);
     return NextResponse.json(
-      { error: 'Failed to process request' },
+      { error: error.message || 'Failed to process request. Please try again.' },
       { status: 500 }
     );
   }

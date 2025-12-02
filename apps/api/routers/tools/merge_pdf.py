@@ -18,9 +18,20 @@ router = APIRouter(prefix="/merge-pdf", tags=["PDF Tools"])
 @router.post("")
 async def merge_pdf(
     files: List[UploadFile] = File(..., description="PDF files to merge (minimum 2)"),
-    remove_metadata: bool = Form(False, description="Remove all metadata from output"),
-    add_bookmarks: bool = Form(True, description="Add bookmarks for each PDF"),
-    output_filename: Optional[str] = Form("merged.pdf", description="Output filename")
+    # Bookmark options
+    addBookmarks: bool = Form(True, description="Add bookmarks for each PDF"),
+    bookmarkStyle: str = Form("filename", description="Bookmark naming: filename, numbered, custom"),
+    # Page options
+    removeBlankPages: bool = Form(False, description="Remove blank pages"),
+    removeDuplicates: bool = Form(False, description="Remove duplicate pages"),
+    # Metadata
+    removeMetadata: bool = Form(False, description="Remove all metadata"),
+    setTitle: str = Form("", description="Set document title"),
+    setAuthor: str = Form("", description="Set document author"),
+    # Optimization
+    compressOutput: bool = Form(False, description="Compress merged output"),
+    linearize: bool = Form(True, description="Optimize for web viewing"),
+    output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
     Merge multiple PDF files into one
@@ -58,14 +69,25 @@ async def merge_pdf(
         # Create output file
         output_file = temp_manager.create_temp_file(suffix="_merged.pdf")
         
-        # Merge PDFs
+        # Merge PDFs with all options
         options = {
-            'remove_metadata': remove_metadata,
-            'add_bookmarks': add_bookmarks,
+            'add_bookmarks': addBookmarks,
+            'bookmark_style': bookmarkStyle,
+            'remove_blank_pages': removeBlankPages,
+            'remove_duplicates': removeDuplicates,
+            'remove_metadata': removeMetadata,
+            'set_title': setTitle,
+            'set_author': setAuthor,
+            'compress_output': compressOutput,
+            'linearize': linearize,
             'preserve_forms': True
         }
         
         PDFProcessor.merge_pdfs(temp_files, output_file, options)
+        
+        # Determine output filename
+        if not output_filename:
+            output_filename = "merged.pdf"
         
         # Return file
         return ResponseHelper.file_response(

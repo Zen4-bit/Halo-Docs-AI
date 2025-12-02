@@ -1,18 +1,72 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
-  Upload, Download, Loader2, CheckCircle2, AlertCircle,
-  X, Image, Maximize2, Link2, Link2Off, Eye, Percent
+  Download, CheckCircle2, Image, Maximize2, Link2, Link2Off, 
+  Percent, Layers, Monitor, Smartphone, HardDrive
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import ToolWorkspaceLayout, { 
+  SettingsSection, 
+  SettingsToggle, 
+  SettingsSlider,
+  SettingsButtonGroup,
+  SettingsInput
+} from '@/components/tools/ToolWorkspaceLayout';
+import FileDropzone from '@/components/tools/FileDropzone';
+
+// Client-side image resize function using Canvas
+async function resizeImageClientSide(
+  file: File, 
+  targetWidth: number, 
+  targetHeight: number, 
+  outputQuality: number,
+  outputFormat: string
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not get canvas context'));
+        return;
+      }
+      
+      // Use high quality image smoothing
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      
+      // Draw the resized image
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+      
+      // Convert to blob
+      const mimeType = outputFormat === 'png' ? 'image/png' : 
+                       outputFormat === 'webp' ? 'image/webp' : 'image/jpeg';
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to create blob'));
+        },
+        mimeType,
+        outputQuality / 100
+      );
+    };
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 const PRESETS = [
   { id: 'custom', label: 'Custom', width: 0, height: 0 },
-  { id: 'hd', label: 'HD (1280×720)', width: 1280, height: 720 },
-  { id: 'fhd', label: 'Full HD (1920×1080)', width: 1920, height: 1080 },
-  { id: '4k', label: '4K (3840×2160)', width: 3840, height: 2160 },
-  { id: 'instagram', label: 'Instagram (1080×1080)', width: 1080, height: 1080 },
-  { id: 'twitter', label: 'Twitter (1200×675)', width: 1200, height: 675 },
+  { id: 'hd', label: 'HD', width: 1280, height: 720 },
+  { id: 'fhd', label: 'FHD', width: 1920, height: 1080 },
+  { id: '4k', label: '4K', width: 3840, height: 2160 },
+  { id: 'instagram', label: 'IG', width: 1080, height: 1080 },
+  { id: 'twitter', label: 'Twitter', width: 1200, height: 675 },
 ];
 
 export default function ImageResizerPage() {
@@ -30,27 +84,19 @@ export default function ImageResizerPage() {
   const [resizeMode, setResizeMode] = useState<'pixels' | 'percentage'>('pixels');
   const [percentage, setPercentage] = useState(100);
   const [preset, setPreset] = useState('custom');
+  const [quality, setQuality] = useState(90);
+  const [format, setFormat] = useState<'original' | 'jpg' | 'png' | 'webp'>('original');
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile?.type.startsWith('image/')) {
-      setFile(droppedFile);
-      setPreview(URL.createObjectURL(droppedFile));
-      setError(null);
-    } else {
-      setError('Please upload an image file');
-    }
-  }, []);
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile?.type.startsWith('image/')) {
+  const handleFilesChange = (files: File[]) => {
+    const selectedFile = files[0];
+    if (selectedFile) {
       setFile(selectedFile);
       setPreview(URL.createObjectURL(selectedFile));
       setError(null);
+      setResult(null);
     } else {
-      setError('Please upload an image file');
+      setFile(null);
+      setPreview(null);
     }
   };
 
@@ -100,42 +146,70 @@ export default function ImageResizerPage() {
     }
   };
 
-  const handleResize = async () => {
-    if (!file) return;
+  const handleResize = useCallback(async () => {
+    if (!file || width <= 0 || height <= 0) return;
 
     setProcessing(true);
     setError(null);
     setProgress(0);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('width', String(width));
-      formData.append('height', String(height));
-
-      const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 5, 90));
-      }, 100);
-
-      const response = await fetch('/api/tools/image-resizer', {
-        method: 'POST',
-        body: formData,
+      // Log all settings being applied
+      console.log('Image Resize Settings:', {
+        width,
+        height,
+        lockAspectRatio,
+        resizeMode,
+        percentage,
+        preset,
+        quality,
+        format,
+        originalDimensions
       });
-
-      clearInterval(progressInterval);
+      
+      setProgress(10);
+      
+      // Calculate actual dimensions based on mode
+      let targetWidth = width;
+      let targetHeight = height;
+      
+      if (resizeMode === 'percentage') {
+        targetWidth = Math.round(originalDimensions.width * (percentage / 100));
+        targetHeight = Math.round(originalDimensions.height * (percentage / 100));
+      }
+      
+      setProgress(20);
+      
+      // Determine output format
+      const outputFormat = format === 'original' 
+        ? (file.type.includes('png') ? 'png' : file.type.includes('webp') ? 'webp' : 'jpg')
+        : format;
+      
+      setProgress(40);
+      
+      // Resize the image client-side
+      const resizedBlob = await resizeImageClientSide(file, targetWidth, targetHeight, quality, outputFormat);
+      
+      setProgress(80);
+      
+      // Create URL for the resized image
+      const url = URL.createObjectURL(resizedBlob);
+      const ext = outputFormat === 'png' ? '.png' : outputFormat === 'webp' ? '.webp' : '.jpg';
+      
       setProgress(100);
-
-      if (!response.ok) throw new Error('Resize failed');
-
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      setResult({ url, name: file.name.replace(/(\.[^.]+)$/, '-resized$1'), size: blob.size });
+      
+      setResult({ 
+        url, 
+        name: file.name.replace(/\.[^.]+$/, `-resized${ext}`), 
+        size: resizedBlob.size 
+      });
     } catch (err: any) {
-      setError(err.message || 'Failed to resize image');
+      console.error('Resize error:', err);
+      setError(err.message || 'Failed to resize image. Please try again.');
     } finally {
       setProcessing(false);
     }
-  };
+  }, [file, width, height, lockAspectRatio, resizeMode, percentage, preset, quality, format, originalDimensions]);
 
   const handleDownload = () => {
     if (result) {
@@ -163,259 +237,232 @@ export default function ImageResizerPage() {
     return (bytes / 1048576).toFixed(2) + ' MB';
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
-      {/* Header */}
-      <div className="relative overflow-hidden border-b border-zinc-800">
-        <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10" />
-        <div className="relative max-w-5xl mx-auto px-6 py-16">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 shadow-lg shadow-indigo-500/25">
-              <Maximize2 className="w-8 h-8 text-white" />
-            </div>
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
-              IMAGE TOOL
-            </span>
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-3">Image Resizer</h1>
-          <p className="text-lg text-zinc-400 max-w-2xl">
-            Resize images to exact dimensions with presets for social media and common sizes.
-          </p>
-        </div>
-      </div>
-
-      <main className="max-w-5xl mx-auto px-6 py-12">
-        {!result ? (
-          <div className="space-y-8">
-            {/* Upload Zone */}
-            {!file ? (
-              <div
-                onDrop={handleDrop}
-                onDragOver={(e) => e.preventDefault()}
-                className="relative border-2 border-dashed border-zinc-700 hover:border-indigo-500/50 rounded-2xl p-12 transition-all duration-300 bg-zinc-900/30 hover:bg-indigo-500/5 group"
-              >
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileInput}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <div className="text-center">
-                  <div className="inline-flex p-4 rounded-2xl bg-zinc-800/50 group-hover:bg-indigo-500/20 transition-colors mb-4">
-                    <Upload className="w-10 h-10 text-zinc-400 group-hover:text-indigo-400 transition-colors" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Drop your image here</h3>
-                  <p className="text-zinc-500">or click to browse</p>
-                  <div className="mt-4 flex items-center justify-center gap-2 flex-wrap">
-                    {['PNG', 'JPG', 'WebP', 'GIF'].map(fmt => (
-                      <span key={fmt} className="px-3 py-1 rounded-full text-xs bg-indigo-500/20 text-indigo-400">.{fmt}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* Preview */}
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800">
-                    <div className="flex items-center gap-2 mb-4 text-sm text-zinc-400">
-                      <Eye className="w-4 h-4" />
-                      Preview
-                    </div>
-                    <div className="relative aspect-video rounded-xl overflow-hidden bg-zinc-800 flex items-center justify-center">
-                      {preview && <img src={preview} alt="Preview" className="max-w-full max-h-full object-contain" />}
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800 flex flex-col justify-center">
-                    <div className="flex items-center gap-4 mb-4">
-                      <div className="p-3 rounded-xl bg-indigo-500/20 text-indigo-400">
-                        <Image className="w-6 h-6" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-white truncate">{file.name}</p>
-                        <p className="text-sm text-zinc-500">
-                          Original: {originalDimensions.width} × {originalDimensions.height}px
-                        </p>
-                      </div>
-                      <button onClick={reset} className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10">
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                    
-                    <div className="p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50">
-                      <p className="text-sm text-zinc-400 mb-2">New dimensions</p>
-                      <p className="text-2xl font-bold text-white">{width} × {height}px</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Presets */}
-                <div className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800">
-                  <h3 className="font-semibold text-white mb-4">Quick Presets</h3>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-                    {PRESETS.map(p => (
-                      <button
-                        key={p.id}
-                        onClick={() => handlePresetChange(p.id)}
-                        className={`p-3 rounded-xl border text-center transition-all ${
-                          preset === p.id
-                            ? 'bg-indigo-500/20 border-indigo-500/50 text-white'
-                            : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:border-zinc-600'
-                        }`}
-                      >
-                        <span className="text-sm font-medium">{p.label}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Resize Mode Toggle */}
-                <div className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800">
-                  <div className="flex items-center gap-4 mb-6">
-                    <button
-                      onClick={() => setResizeMode('pixels')}
-                      className={`flex-1 p-4 rounded-xl border text-center transition-all ${
-                        resizeMode === 'pixels'
-                          ? 'bg-indigo-500/20 border-indigo-500/50 text-white'
-                          : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:border-zinc-600'
-                      }`}
-                    >
-                      <Maximize2 className="w-5 h-5 mx-auto mb-2" />
-                      <span className="font-medium">By Pixels</span>
-                    </button>
-                    <button
-                      onClick={() => setResizeMode('percentage')}
-                      className={`flex-1 p-4 rounded-xl border text-center transition-all ${
-                        resizeMode === 'percentage'
-                          ? 'bg-indigo-500/20 border-indigo-500/50 text-white'
-                          : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:border-zinc-600'
-                      }`}
-                    >
-                      <Percent className="w-5 h-5 mx-auto mb-2" />
-                      <span className="font-medium">By Percentage</span>
-                    </button>
-                  </div>
-
-                  {resizeMode === 'pixels' ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex-1">
-                          <label className="block text-sm font-medium text-zinc-300 mb-2">Width (px)</label>
-                          <input
-                            type="number"
-                            value={width}
-                            onChange={(e) => handleWidthChange(parseInt(e.target.value) || 0)}
-                            className="w-full px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-white focus:border-indigo-500 focus:outline-none"
-                          />
-                        </div>
-                        <button
-                          onClick={() => setLockAspectRatio(!lockAspectRatio)}
-                          className={`mt-6 p-3 rounded-xl border transition-all ${
-                            lockAspectRatio
-                              ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400'
-                              : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-500'
-                          }`}
-                        >
-                          {lockAspectRatio ? <Link2 className="w-5 h-5" /> : <Link2Off className="w-5 h-5" />}
-                        </button>
-                        <div className="flex-1">
-                          <label className="block text-sm font-medium text-zinc-300 mb-2">Height (px)</label>
-                          <input
-                            type="number"
-                            value={height}
-                            onChange={(e) => handleHeightChange(parseInt(e.target.value) || 0)}
-                            className="w-full px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-white focus:border-indigo-500 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-300 mb-3">Scale: {percentage}%</label>
-                      <input
-                        type="range"
-                        min={10}
-                        max={200}
-                        value={percentage}
-                        onChange={(e) => handlePercentageChange(parseInt(e.target.value))}
-                        className="w-full accent-indigo-500"
-                      />
-                      <div className="flex justify-between text-xs text-zinc-500 mt-2">
-                        <span>10%</span>
-                        <span>100%</span>
-                        <span>200%</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {error && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p>{error}</p>
-              </div>
-            )}
-
-            {file && (
+  // Settings Panel
+  const settingsPanel = (
+    <>
+      {/* Dimensions */}
+      <SettingsSection title="Dimensions" icon={<Maximize2 className="w-4 h-4" />}>
+        <SettingsButtonGroup
+          label="Mode"
+          value={resizeMode}
+          onChange={(v) => setResizeMode(v as typeof resizeMode)}
+          options={[
+            { value: 'pixels', label: 'Pixels' },
+            { value: 'percentage', label: '%' },
+          ]}
+        />
+        
+        {resizeMode === 'pixels' ? (
+          <div className="mt-3 space-y-3">
+            <div className="flex items-center gap-2">
+              <SettingsInput
+                label="Width"
+                type="number"
+                value={String(width)}
+                onChange={(v) => handleWidthChange(parseInt(v) || 0)}
+                placeholder="Width"
+              />
               <button
-                onClick={handleResize}
-                disabled={processing || width <= 0 || height <= 0}
-                className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-3 ${
-                  processing || width <= 0 || height <= 0
-                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:shadow-lg hover:shadow-indigo-500/25 hover:scale-[1.02] active:scale-[0.98]'
+                onClick={() => setLockAspectRatio(!lockAspectRatio)}
+                className={`mt-5 p-2 rounded-lg transition-colors ${
+                  lockAspectRatio ? 'text-indigo-500 dark:text-indigo-400 bg-indigo-500/20' : 'text-slate-400 dark:text-white/30 bg-slate-100 dark:bg-white/5'
                 }`}
               >
-                {processing ? (
-                  <>
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                    Resizing... {progress}%
-                  </>
-                ) : (
-                  <>
-                    <Maximize2 className="w-6 h-6" />
-                    Resize Image
-                  </>
-                )}
+                {lockAspectRatio ? <Link2 className="w-4 h-4" /> : <Link2Off className="w-4 h-4" />}
               </button>
-            )}
-
-            {processing && (
-              <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-300" style={{ width: `${progress}%` }} />
-              </div>
-            )}
+              <SettingsInput
+                label="Height"
+                type="number"
+                value={String(height)}
+                onChange={(v) => handleHeightChange(parseInt(v) || 0)}
+                placeholder="Height"
+              />
+            </div>
           </div>
         ) : (
-          <div className="space-y-8">
-            <div className="text-center py-8">
-              <div className="inline-flex p-6 rounded-3xl bg-green-500/20 mb-6">
-                <CheckCircle2 className="w-16 h-16 text-green-400" />
-              </div>
-              <h2 className="text-2xl font-bold text-white mb-2">Image Resized!</h2>
-              <p className="text-zinc-400">{result.name} • {formatSize(result.size)}</p>
-              <p className="text-zinc-500 text-sm mt-1">New size: {width} × {height}px</p>
-            </div>
-
-            <div className="p-4 rounded-2xl bg-zinc-900/50 border border-zinc-800">
-              <img src={result.url} alt="Resized" className="max-w-full mx-auto rounded-lg" />
-            </div>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button onClick={handleDownload} className="px-8 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold hover:shadow-lg hover:shadow-green-500/25 transition-all inline-flex items-center justify-center gap-2">
-                <Download className="w-5 h-5" />
-                Download Resized Image
-              </button>
-              <button onClick={reset} className="px-8 py-4 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700 transition-colors">
-                Resize Another Image
-              </button>
-            </div>
+          <div className="mt-3">
+            <SettingsSlider
+              label="Scale"
+              value={percentage}
+              onChange={handlePercentageChange}
+              min={10}
+              max={200}
+              unit="%"
+            />
           </div>
         )}
-      </main>
-    </div>
+      </SettingsSection>
+
+      {/* Presets */}
+      <SettingsSection title="Presets" icon={<Monitor className="w-4 h-4" />} defaultOpen={false}>
+        <div className="grid grid-cols-3 gap-2">
+          {PRESETS.filter(p => p.id !== 'custom').map(p => (
+            <button
+              key={p.id}
+              onClick={() => handlePresetChange(p.id)}
+              className={`p-2 rounded-lg text-xs font-medium transition-colors ${
+                preset === p.id 
+                  ? 'bg-indigo-500/30 text-slate-900 dark:text-white' 
+                  : 'bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-white/50 hover:bg-slate-200 dark:hover:bg-white/10'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </SettingsSection>
+
+      {/* Quality & Format */}
+      <SettingsSection title="Output" icon={<Layers className="w-4 h-4" />} defaultOpen={false}>
+        <SettingsSlider
+          label="Quality"
+          value={quality}
+          onChange={setQuality}
+          min={10}
+          max={100}
+          unit="%"
+        />
+        <div className="mt-3">
+          <SettingsButtonGroup
+            label="Format"
+            value={format}
+            onChange={(v) => setFormat(v as typeof format)}
+            options={[
+              { value: 'original', label: 'Same' },
+              { value: 'jpg', label: 'JPG' },
+              { value: 'png', label: 'PNG' },
+              { value: 'webp', label: 'WebP' },
+            ]}
+          />
+        </div>
+      </SettingsSection>
+    </>
+  );
+
+  return (
+    <ToolWorkspaceLayout
+      toolName="Image Resizer"
+      toolIcon={<Maximize2 className="w-5 h-5 text-white" />}
+      toolColor="from-indigo-500 to-purple-500"
+      settingsPanel={settingsPanel}
+      actionButton={{
+        label: 'Resize Image',
+        onClick: handleResize,
+        disabled: !file || width <= 0 || height <= 0,
+        loading: processing,
+        loadingText: `Resizing... ${progress}%`,
+        icon: <Maximize2 className="w-5 h-5" />,
+      }}
+    >
+      {!result ? (
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* File Dropzone */}
+          <FileDropzone
+            files={file ? [file] : []}
+            onFilesChange={handleFilesChange}
+            accept="image/*"
+            multiple={false}
+            title="Drop image here"
+            description="or click to browse • PNG, JPG, WebP, GIF"
+            icon={<Image className="w-8 h-8" />}
+            accentColor="purple"
+            disabled={processing}
+          />
+
+          {/* Image Preview */}
+          {file && preview && (
+            <div className="p-6 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-medium text-slate-700 dark:text-white/80">Preview</h3>
+                <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-white/40">
+                  <HardDrive className="w-3 h-3" />
+                  {formatSize(file.size)}
+                </div>
+              </div>
+              
+              <div className="relative aspect-video rounded-xl overflow-hidden bg-black/20 flex items-center justify-center">
+                <img src={preview} alt="Preview" className="max-w-full max-h-full object-contain" />
+              </div>
+              
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <div className="p-3 rounded-lg bg-slate-50 dark:bg-white/5">
+                  <p className="text-xs text-slate-500 dark:text-white/40 mb-1">Original</p>
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">{originalDimensions.width} × {originalDimensions.height}px</p>
+                </div>
+                <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
+                  <p className="text-xs text-indigo-500/60 dark:text-indigo-400/60 mb-1">New size</p>
+                  <p className="text-sm font-medium text-indigo-500 dark:text-indigo-400">{width} × {height}px</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm"
+              >
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Progress */}
+          {processing && (
+            <div className="space-y-2">
+              <div className="w-full h-2 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="text-xs text-slate-500 dark:text-white/40 text-center">Resizing your image...</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Success State */
+        <div className="max-w-2xl mx-auto space-y-6">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="text-center py-8"
+          >
+            <div className="inline-flex p-6 rounded-3xl bg-green-500/20 mb-6">
+              <CheckCircle2 className="w-16 h-16 text-green-500 dark:text-green-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Image Resized!</h2>
+            <p className="text-slate-600 dark:text-white/60">{result.name} • {formatSize(result.size)}</p>
+            <p className="text-slate-500 dark:text-white/40 text-sm mt-1">New size: {width} × {height}px</p>
+          </motion.div>
+
+          <div className="p-4 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+            <img src={result.url} alt="Resized" className="max-w-full mx-auto rounded-lg" />
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <button
+              onClick={handleDownload}
+              className="px-8 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold 
+                hover:shadow-lg hover:shadow-green-500/25 transition-all inline-flex items-center justify-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+              Download Image
+            </button>
+            <button
+              onClick={reset}
+              className="px-8 py-4 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-white/70 font-semibold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+            >
+              Resize Another
+            </button>
+          </div>
+        </div>
+      )}
+    </ToolWorkspaceLayout>
   );
 }

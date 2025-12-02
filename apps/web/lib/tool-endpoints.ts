@@ -37,11 +37,17 @@ export const TOOL_ENDPOINTS = {
   PDF_REDACT: '/pdf/redact',
   PDF_REPAIR: '/pdf/repair',
   PDF_PAGE_NUMBERS: '/pdf/page-numbers',
+  PDF_UNLOCK: '/pdf/unlock',
+  PDF_PASSWORD: '/pdf/password',
 
   // Office Productivity Tools
   RESUME_OPTIMIZE: '/office/resume-optimize',
   PROPOSAL_GENERATE: '/office/proposal-generate',
   PROPOSAL_WRITER: '/office/proposal-generate',
+  WORD_TO_PDF: '/office/word-to-pdf',
+  EXCEL_TO_PDF: '/office/excel-to-pdf',
+  PPT_TO_PDF: '/office/ppt-to-pdf',
+  PDF_TO_IMAGE: '/pdf/to-image',
 
   // Document Tools
   UPLOAD_GENERATE_URL: '/upload/generate-url',
@@ -61,6 +67,11 @@ export const TOOL_ENDPOINTS = {
 
   // Media
   VIDEO_DOWNLOADER: '/media/video-download',
+  VIDEO_COMPRESSOR: '/media/video-compress',
+  JPEG_TO_PNG: '/media/jpeg-to-png',
+  IMAGE_COMPRESS: '/media/image-compress',
+  IMAGE_RESIZE: '/media/image-resize',
+  IMAGE_CROP: '/media/image-crop',
 } as const;
 
 export type ToolEndpoint = typeof TOOL_ENDPOINTS[keyof typeof TOOL_ENDPOINTS];
@@ -97,21 +108,51 @@ export function getToolEndpoint(toolName: string): string {
 
     // PDF Tools
     'merge': TOOL_ENDPOINTS.PDF_MERGE,
+    'merge-pdf': TOOL_ENDPOINTS.PDF_MERGE,
     'split': TOOL_ENDPOINTS.PDF_SPLIT,
+    'split-pdf': TOOL_ENDPOINTS.PDF_SPLIT,
     'compress': TOOL_ENDPOINTS.PDF_COMPRESS,
+    'compress-pdf': TOOL_ENDPOINTS.PDF_COMPRESS,
     'rotate': TOOL_ENDPOINTS.PDF_ROTATE,
+    'rotate-pdf': TOOL_ENDPOINTS.PDF_ROTATE,
     'watermark': TOOL_ENDPOINTS.PDF_WATERMARK,
+    'add-watermark': TOOL_ENDPOINTS.PDF_WATERMARK,
     'pdf-redact': TOOL_ENDPOINTS.PDF_REDACT,
     'repair': TOOL_ENDPOINTS.PDF_REPAIR,
+    'repair-pdf': TOOL_ENDPOINTS.PDF_REPAIR,
     'page-numbers': TOOL_ENDPOINTS.PDF_PAGE_NUMBERS,
+    'add-page-numbers': TOOL_ENDPOINTS.PDF_PAGE_NUMBERS,
+    'unlock': TOOL_ENDPOINTS.PDF_UNLOCK,
+    'unlock-pdf': TOOL_ENDPOINTS.PDF_UNLOCK,
+    'pdf-password': TOOL_ENDPOINTS.PDF_PASSWORD,
 
     // Office Tools
     'resume-optimize': TOOL_ENDPOINTS.RESUME_OPTIMIZE,
     'proposal-generate': TOOL_ENDPOINTS.PROPOSAL_GENERATE,
     'proposal-writer': TOOL_ENDPOINTS.PROPOSAL_WRITER,
+    'word-to-pdf': TOOL_ENDPOINTS.WORD_TO_PDF,
+    'excel-to-pdf': TOOL_ENDPOINTS.EXCEL_TO_PDF,
+    'ppt-to-pdf': TOOL_ENDPOINTS.PPT_TO_PDF,
+    'pdf-to-image': TOOL_ENDPOINTS.PDF_TO_IMAGE,
 
-    // Media
+    // Media Tools
     'video-downloader': TOOL_ENDPOINTS.VIDEO_DOWNLOADER,
+    'video-compressor': TOOL_ENDPOINTS.VIDEO_COMPRESSOR,
+    'jpeg-to-png': TOOL_ENDPOINTS.JPEG_TO_PNG,
+    'image-compressor': TOOL_ENDPOINTS.IMAGE_COMPRESS,
+    'jpeg-compressor': TOOL_ENDPOINTS.IMAGE_COMPRESS,
+    'png-compressor': TOOL_ENDPOINTS.IMAGE_COMPRESS,
+    'gif-compressor': TOOL_ENDPOINTS.IMAGE_COMPRESS,
+    'webp-compressor': TOOL_ENDPOINTS.IMAGE_COMPRESS,
+    'image-resizer': TOOL_ENDPOINTS.IMAGE_RESIZE,
+    'resize-jpg': TOOL_ENDPOINTS.IMAGE_RESIZE,
+    'resize-png': TOOL_ENDPOINTS.IMAGE_RESIZE,
+    'resize-webp': TOOL_ENDPOINTS.IMAGE_RESIZE,
+    'bulk-resize': TOOL_ENDPOINTS.IMAGE_RESIZE,
+    'crop-image': TOOL_ENDPOINTS.IMAGE_CROP,
+    'crop-jpg': TOOL_ENDPOINTS.IMAGE_CROP,
+    'crop-png': TOOL_ENDPOINTS.IMAGE_CROP,
+    'crop-webp': TOOL_ENDPOINTS.IMAGE_CROP,
   };
 
   return endpointMap[toolName] || `/tools/${toolName}`;

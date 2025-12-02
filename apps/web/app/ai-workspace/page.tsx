@@ -64,93 +64,91 @@ export default function AIWorkspacePage() {
     );
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-                {/* Header */}
-                <div className="text-center mb-12">
-                    <div className="inline-flex items-center gap-3 mb-4">
-                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center">
-                            <Brain className="w-7 h-7 text-white" />
-                        </div>
-                        <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-                            AI Workspace
-                        </h1>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {/* Header */}
+            <div className="text-center mb-10">
+                <div className="inline-flex items-center gap-3 mb-4">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center">
+                        <Brain className="w-7 h-7 text-white" />
                     </div>
-                    <p className="text-lg text-slate-400 max-w-2xl mx-auto">
-                        Powerful AI tools for content creation, analysis, and transformation
-                    </p>
+                    <h1 className="text-4xl font-bold tool-text">
+                        AI Workspace
+                    </h1>
                 </div>
+                <p className="text-lg tool-text-secondary max-w-2xl mx-auto">
+                    Powerful AI tools for content creation, analysis, and transformation
+                </p>
+            </div>
 
-                {/* Search */}
-                <div className="max-w-2xl mx-auto mb-12">
-                    <input
-                        type="text"
-                        placeholder="Search AI tools..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full px-6 py-4 rounded-2xl bg-slate-800/50 border border-slate-700 text-white placeholder-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-                    />
-                </div>
+            {/* Search */}
+            <div className="max-w-2xl mx-auto mb-10">
+                <input
+                    type="text"
+                    placeholder="Search AI tools..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="tool-input w-full px-6 py-4 rounded-2xl focus:border-primary focus:ring-2 focus:ring-primary/20"
+                />
+            </div>
 
-                {/* Tools Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {filteredTools.map((tool) => {
-                        const Icon = tool.icon;
-                        return (
-                            <Link
-                                key={tool.id}
-                                href={tool.href}
-                                className="group relative p-6 rounded-2xl bg-slate-800/30 border border-slate-700/50 hover:border-slate-600 transition-all duration-300 hover:transform hover:scale-105"
-                            >
-                                {/* Gradient Background on Hover */}
-                                <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${tool.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
+            {/* Tools Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredTools.map((tool) => {
+                    const Icon = tool.icon;
+                    return (
+                        <Link
+                            key={tool.id}
+                            href={tool.href}
+                            className="group relative p-6 rounded-2xl tool-card transition-all duration-300 hover:transform hover:scale-[1.02]"
+                        >
+                            {/* Gradient Background on Hover */}
+                            <div className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${tool.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`} />
 
-                                <div className="relative">
-                                    {/* Icon */}
-                                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tool.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
-                                        <Icon className="w-6 h-6 text-white" />
-                                    </div>
-
-                                    {/* Content */}
-                                    <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-transparent group-hover:bg-gradient-to-r group-hover:bg-clip-text group-hover:from-white group-hover:to-slate-300 transition-all">
-                                        {tool.title}
-                                    </h3>
-                                    <p className="text-slate-400 text-sm leading-relaxed">
-                                        {tool.description}
-                                    </p>
-
-                                    {/* Arrow Icon */}
-                                    <div className="mt-4 flex items-center gap-2 text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                        <span className="text-sm font-medium">Open Tool</span>
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                        </svg>
-                                    </div>
+                            <div className="relative">
+                                {/* Icon */}
+                                <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tool.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300`}>
+                                    <Icon className="w-6 h-6 text-white" />
                                 </div>
-                            </Link>
-                        );
-                    })}
+
+                                {/* Content */}
+                                <h3 className="text-xl font-semibold tool-text mb-2 transition-all">
+                                    {tool.title}
+                                </h3>
+                                <p className="tool-text-secondary text-sm leading-relaxed">
+                                    {tool.description}
+                                </p>
+
+                                {/* Arrow Icon */}
+                                <div className="mt-4 flex items-center gap-2 text-primary opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                    <span className="text-sm font-medium">Open Tool</span>
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </div>
+                            </div>
+                        </Link>
+                    );
+                })}
+            </div>
+
+            {/* No Results */}
+            {filteredTools.length === 0 && (
+                <div className="text-center py-12">
+                    <p className="tool-text-muted">No tools found matching "{searchQuery}"</p>
                 </div>
+            )}
 
-                {/* No Results */}
-                {filteredTools.length === 0 && (
-                    <div className="text-center py-12">
-                        <p className="text-slate-500">No tools found matching "{searchQuery}"</p>
+            {/* Info Banner */}
+            <div className="mt-10 p-6 rounded-2xl bg-gradient-to-r from-primary/10 to-purple-500/10 tool-border border">
+                <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
+                        <Brain className="w-5 h-5 text-primary" />
                     </div>
-                )}
-
-                {/* Info Banner */}
-                <div className="mt-12 p-6 rounded-2xl bg-gradient-to-r from-primary/10 to-purple-500/10 border border-primary/20">
-                    <div className="flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center flex-shrink-0">
-                            <Brain className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                            <h3 className="font-semibold text-white mb-2">Server-Powered AI</h3>
-                            <p className="text-sm text-slate-400">
-                                These AI tools use server-side processing with secure API integration. Your data is processed securely and not stored permanently.
-                            </p>
-                        </div>
+                    <div>
+                        <h3 className="font-semibold tool-text mb-2">Server-Powered AI</h3>
+                        <p className="text-sm tool-text-secondary">
+                            These AI tools use server-side processing with secure API integration. Your data is processed securely and not stored permanently.
+                        </p>
                     </div>
                 </div>
             </div>

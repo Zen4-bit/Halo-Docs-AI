@@ -16,12 +16,18 @@ router = APIRouter(prefix="/add-watermark", tags=["PDF Tools"])
 @router.post("")
 async def add_watermark(
     file: UploadFile = File(..., description="PDF file to watermark"),
-    watermark_text: str = Form("CONFIDENTIAL", description="Watermark text"),
-    position: str = Form("center", description="Position: center, diagonal, header, footer"),
-    opacity: float = Form(0.3, description="Opacity (0.1-1.0)"),
-    font_size: int = Form(48, description="Font size (12-200)"),
+    watermarkText: str = Form("CONFIDENTIAL", description="Watermark text"),
+    fontFamily: str = Form("helvetica", description="Font family: helvetica, times, courier"),
+    fontSize: int = Form(48, description="Font size (12-200)"),
     color: str = Form("gray", description="Color: gray, red, blue, black"),
-    pages: str = Form("all", description="Pages to watermark: all, odd, even, or range like 1-5"),
+    opacity: int = Form(30, description="Opacity (10-100)"),
+    rotation: int = Form(0, description="Rotation angle (-180 to 180)"),
+    useImageWatermark: bool = Form(False, description="Use image watermark instead of text"),
+    imageSize: int = Form(100, description="Image watermark size percentage"),
+    tileWatermark: bool = Form(False, description="Tile watermark across page"),
+    position: str = Form("center", description="Position: center, top-left, top-center, top-right, bottom-left, bottom-center, bottom-right"),
+    pageOption: str = Form("all", description="Pages to watermark: all, odd, even, range"),
+    pageRange: str = Form("", description="Page range if pageOption is 'range', e.g. 1-5, 8"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -44,9 +50,17 @@ async def add_watermark(
         is_valid, error = await FileValidator.validate_pdf(file)
         FileValidator.raise_if_invalid(is_valid, error)
         
-        # Validate parameters
-        opacity = max(0.1, min(1.0, opacity))
-        font_size = max(12, min(200, font_size))
+        # Validate and normalize parameters
+        opacity_float = max(0.1, min(1.0, opacity / 100))
+        font_size = max(12, min(200, fontSize))
+        
+        # Font family mapping
+        font_map = {
+            "helvetica": "Helvetica-Bold",
+            "times": "Times-Bold",
+            "courier": "Courier-Bold"
+        }
+        font_name = font_map.get(fontFamily.lower(), "Helvetica-Bold")
         
         # Read file
         content = await file.read()
@@ -77,23 +91,24 @@ async def add_watermark(
         
         # Determine which pages to watermark
         def should_watermark(page_num):
-            if pages == "all":
+            if pageOption == "all":
                 return True
-            elif pages == "odd":
+            elif pageOption == "odd":
                 return page_num % 2 == 1
-            elif pages == "even":
+            elif pageOption == "even":
                 return page_num % 2 == 0
-            else:
+            elif pageOption == "range" and pageRange:
                 # Parse range like "1-5" or "1,3,5"
                 try:
-                    if "-" in pages:
-                        start, end = pages.split("-")
+                    if "-" in pageRange:
+                        start, end = pageRange.split("-")
                         return int(start) <= page_num <= int(end)
                     else:
-                        page_list = [int(p.strip()) for p in pages.split(",")]
+                        page_list = [int(p.strip()) for p in pageRange.split(",")]
                         return page_num in page_list
                 except:
                     return True
+            return True
         
         for page_num, page in enumerate(reader.pages, 1):
             if should_watermark(page_num):
@@ -105,31 +120,47 @@ async def add_watermark(
                 watermark_buffer = io.BytesIO()
                 c = canvas.Canvas(watermark_buffer, pagesize=(page_width, page_height))
                 
-                # Set transparency
-                c.setFillColor(Color(rgb[0], rgb[1], rgb[2], alpha=opacity))
-                c.setFont("Helvetica-Bold", font_size)
+                # Set transparency and font
+                c.setFillColor(Color(rgb[0], rgb[1], rgb[2], alpha=opacity_float))
+                c.setFont(font_name, font_size)
                 
                 # Calculate text width for positioning
-                text_width = c.stringWidth(watermark_text, "Helvetica-Bold", font_size)
+                text_width = c.stringWidth(watermarkText, font_name, font_size)
                 
-                if position == "center":
+                # Position mapping
+                pos_coords = {
+                    "center": (page_width / 2, page_height / 2),
+                    "top-left": (50 + text_width / 2, page_height - 50),
+                    "top-center": (page_width / 2, page_height - 50),
+                    "top-right": (page_width - 50 - text_width / 2, page_height - 50),
+                    "bottom-left": (50 + text_width / 2, 50),
+                    "bottom-center": (page_width / 2, 50),
+                    "bottom-right": (page_width - 50 - text_width / 2, 50)
+                }
+                
+                x_pos, y_pos = pos_coords.get(position, (page_width / 2, page_height / 2))
+                
+                # Handle tiled watermark
+                if tileWatermark:
+                    # Draw watermark in a grid pattern
                     c.saveState()
-                    c.translate(page_width / 2, page_height / 2)
-                    c.drawCentredString(0, 0, watermark_text)
+                    spacing_x = text_width + 100
+                    spacing_y = font_size + 100
+                    for y in range(0, int(page_height), int(spacing_y)):
+                        for x in range(0, int(page_width), int(spacing_x)):
+                            c.saveState()
+                            c.translate(x + spacing_x / 2, y + spacing_y / 2)
+                            c.rotate(rotation if rotation else 45)
+                            c.drawCentredString(0, 0, watermarkText)
+                            c.restoreState()
                     c.restoreState()
-                    
-                elif position == "diagonal":
+                else:
+                    # Single watermark at position
                     c.saveState()
-                    c.translate(page_width / 2, page_height / 2)
-                    c.rotate(45)
-                    c.drawCentredString(0, 0, watermark_text)
+                    c.translate(x_pos, y_pos)
+                    c.rotate(rotation)
+                    c.drawCentredString(0, 0, watermarkText)
                     c.restoreState()
-                    
-                elif position == "header":
-                    c.drawCentredString(page_width / 2, page_height - 50, watermark_text)
-                    
-                elif position == "footer":
-                    c.drawCentredString(page_width / 2, 30, watermark_text)
                 
                 c.save()
                 watermark_buffer.seek(0)

@@ -35,10 +35,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
           position="top-right"
           toastOptions={{
             duration: 4000,
+            className: 'tool-bg-surface tool-border tool-text',
             style: {
-              background: '#1a1a2e',
-              color: '#fff',
-              border: '1px solid #2d2d44',
+              background: 'rgb(var(--surface))',
+              color: 'rgb(var(--text))',
+              border: '1px solid rgb(var(--border))',
             },
             success: {
               iconTheme: {

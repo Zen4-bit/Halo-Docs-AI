@@ -1,57 +1,76 @@
 # HALO AI Platform - Frontend for Google Cloud Run
-# Production-optimized Next.js frontend using node:18-alpine
+# Production-optimized Next.js 15 frontend
 
-FROM node:18-alpine AS base
+FROM node:20-alpine AS base
 
-# Install dependencies only when needed
+# ================================
+# DEPENDENCIES STAGE
+# ================================
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat python3 make g++
 WORKDIR /app
 
-# Copy package files
+# Copy root package files (monorepo)
 COPY package*.json ./
+
+# Copy web app package files
 COPY apps/web/package*.json ./apps/web/
 
-# Install dependencies
-RUN npm ci --omit=dev
+# Install ALL dependencies (including dev for build)
+RUN npm install --legacy-peer-deps
 
-# Rebuild the source code only when needed
+# ================================
+# BUILDER STAGE
+# ================================
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
 
+# Copy dependencies from root (monorepo installs at root level)
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy source code
 COPY . .
+
+# Set build-time environment variables
+ARG NEXT_PUBLIC_API_BASE
+ENV NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}
 
 # Build the application
 WORKDIR /app/apps/web
 RUN npm run build
 
-# Production image, copy all the files and run next
+# ================================
+# PRODUCTION STAGE
+# ================================
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
-
-# Copy built application
-COPY --from=builder /app/apps/web/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./.next/static
-
-USER nextjs
-
-# Expose port 3000 for Cloud Run
-EXPOSE 3000
-
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:3000/ || exit 1
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-# Start the application
-CMD ["node", "server.js"]
+# Copy standalone build (monorepo structure)
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+
+# Copy static files to the correct location within standalone
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+
+# Copy public assets to the correct location
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
+
+# Switch to non-root user
+USER nextjs
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+
+# Start the application from the correct path (monorepo structure)
+CMD ["node", "apps/web/server.js"]

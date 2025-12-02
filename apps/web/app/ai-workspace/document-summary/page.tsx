@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   FileText, Loader2, Copy, Check, Zap, Upload, X, Image, 
   Settings2, Globe, ListOrdered, Hash, Heart, Users, Tag,
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AIResponseRenderer from '@/components/ai/AIResponseRenderer';
+import { useAIHistory } from '@/context/AIHistoryContext';
 
 const SUMMARY_LEVELS = [
   { id: 'short', label: 'Short', description: '2-3 sentences', icon: '⚡' },
@@ -51,6 +52,49 @@ export default function DocumentSummaryPage() {
   const [entities, setEntities] = useState<any>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Shared history context
+  const { updateCurrentSession, selectedItemData, isNewChat } = useAIHistory();
+  
+  // Restore session when a history item is selected
+  useEffect(() => {
+    if (selectedItemData) {
+      try {
+        if (selectedItemData.text) setText(selectedItemData.text);
+        if (selectedItemData.summary) setSummary(selectedItemData.summary);
+        if (selectedItemData.topics) setTopics(selectedItemData.topics);
+        if (selectedItemData.sentiment) setSentiment(selectedItemData.sentiment);
+        if (selectedItemData.entities) setEntities(selectedItemData.entities);
+      } catch (error) {
+        console.error('Error restoring summary session:', error);
+      }
+    }
+  }, [selectedItemData]);
+  
+  // Handle new chat action
+  useEffect(() => {
+    if (isNewChat) {
+      setText('');
+      setSummary('');
+      setTopics([]);
+      setSentiment('');
+      setEntities(null);
+      setError('');
+      setAttachedFile(null);
+      setFilePreview(null);
+    }
+  }, [isNewChat]);
+  
+  // Save to history when summary is complete
+  useEffect(() => {
+    if (summary && !loading) {
+      updateCurrentSession(
+        text.slice(0, 50) + (text.length > 50 ? '...' : ''),
+        { text, summary, topics, sentiment, entities },
+        summary.slice(0, 100)
+      );
+    }
+  }, [summary, loading, updateCurrentSession]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -138,28 +182,36 @@ export default function DocumentSummaryPage() {
     a.click();
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
-      {/* Header */}
-      <div className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-xl">
-        <div className="max-w-5xl mx-auto px-6 py-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 shadow-lg shadow-purple-500/25">
-              <FileText className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">AI Document Summary</h1>
-              <p className="text-zinc-400">Intelligent summarization with topic & sentiment extraction</p>
-            </div>
-          </div>
-        </div>
-      </div>
+  // Listen for tool actions from header
+  useEffect(() => {
+    const handleToolAction = (e: CustomEvent) => {
+      switch (e.detail) {
+        case 'upload':
+          fileInputRef.current?.click();
+          break;
+        case 'analyze':
+          handleSummarize();
+          break;
+        case 'copy':
+          handleCopy();
+          break;
+        case 'download':
+          handleDownload();
+          break;
+      }
+    };
+    window.addEventListener('tool-action', handleToolAction as EventListener);
+    return () => window.removeEventListener('tool-action', handleToolAction as EventListener);
+  }, [summary]);
 
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+  return (
+    <div className="flex flex-col h-full pt-12 md:pt-0">
+      <main className="flex-1 overflow-y-auto min-h-0">
+        <div className="max-w-[850px] mx-auto px-3 sm:px-4 py-4 space-y-4">
         {/* Upload Zone */}
         <div
           onClick={() => fileInputRef.current?.click()}
-          className="relative border-2 border-dashed border-zinc-700 hover:border-purple-500/50 rounded-2xl p-8 transition-all cursor-pointer bg-zinc-900/30 hover:bg-purple-500/5 group"
+          className="tool-upload-zone cursor-pointer hover:border-purple-500/50 hover:bg-purple-500/5 group"
         >
           <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.txt,.md,image/*" onChange={handleFileSelect} className="hidden" />
           
@@ -270,27 +322,6 @@ export default function DocumentSummaryPage() {
           )}
         </div>
 
-        {/* Summarize Button */}
-        <button
-          onClick={handleSummarize}
-          disabled={loading || (!text.trim() && !attachedFile)}
-          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold hover:shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all"
-        >
-          {loading ? (
-            <>
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-              >
-                <Loader2 className="w-5 h-5" />
-              </motion.div>
-              Analyzing...
-            </>
-          ) : (
-            <><Zap className="w-5 h-5" />Generate Summary</>
-          )}
-        </button>
-
         {/* Error */}
         {error && <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400">{error}</div>}
 
@@ -354,7 +385,28 @@ export default function DocumentSummaryPage() {
             </div>
           </motion.div>
         )}
+        </div>
       </main>
+
+      {/* Summarize Button - Fixed at bottom */}
+      <div className="flex-shrink-0 border-t border-border bg-surface/95 backdrop-blur-xl">
+        <div className="max-w-[850px] mx-auto px-4 py-2">
+          <button
+            onClick={handleSummarize}
+            disabled={loading || (!text.trim() && !attachedFile)}
+            className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold hover:shadow-lg hover:shadow-purple-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Analyzing...
+              </>
+            ) : (
+              <><Zap className="w-5 h-5" />Generate Summary</>
+            )}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

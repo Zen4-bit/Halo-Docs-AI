@@ -2,13 +2,23 @@
 
 import { useState, useCallback } from 'react';
 import { 
-  FileText, Upload, X, GripVertical, Download, Loader2, 
-  Plus, Trash2, ChevronUp, ChevronDown, CheckCircle2, AlertCircle,
-  Layers, Settings2, Bookmark, FileX
+  FileText, Layers, GripVertical, Trash2, Plus, 
+  Bookmark, FileX, SortAsc, SortDesc, FileImage,
+  Scissors, RotateCw, Minimize2, CheckCircle2, Download
 } from 'lucide-react';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { motion, AnimatePresence } from 'framer-motion';
+import ToolWorkspaceLayout, { 
+  SettingsSection, 
+  SettingsToggle, 
+  SettingsSlider,
+  SettingsSelect,
+  SettingsButtonGroup 
+} from '@/components/tools/ToolWorkspaceLayout';
+import FileDropzone from '@/components/tools/FileDropzone';
+import { PDFDocument } from 'pdf-lib';
 
 interface PDFFile {
   id: string;
@@ -18,6 +28,7 @@ interface PDFFile {
   pages?: number;
 }
 
+// Sortable PDF Item Component
 function SortableItem({ pdf, onRemove }: { pdf: PDFFile; onRemove: (id: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: pdf.id });
   
@@ -34,80 +45,91 @@ function SortableItem({ pdf, onRemove }: { pdf: PDFFile; onRemove: (id: string) 
   };
 
   return (
-    <div
+    <motion.div
       ref={setNodeRef}
       style={style}
-      className={`group flex items-center gap-4 p-4 rounded-xl border transition-all duration-200 ${
+      layout
+      className={`group flex items-center gap-3 p-3 rounded-xl border transition-all duration-200 ${
         isDragging 
-          ? 'bg-amber-500/20 border-amber-500/50 shadow-xl shadow-amber-500/20 scale-[1.02]' 
-          : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50'
+          ? 'bg-red-500/20 border-red-500/50 shadow-xl shadow-red-500/20 scale-[1.02]' 
+          : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/8 hover:border-slate-300 dark:hover:border-white/20'
       }`}
     >
       <button
         {...attributes}
         {...listeners}
-        className="p-2 rounded-lg hover:bg-zinc-700/50 cursor-grab active:cursor-grabbing text-zinc-400 hover:text-amber-400 transition-colors"
+        className="p-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-white/10 cursor-grab active:cursor-grabbing text-slate-400 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/80 transition-colors"
       >
-        <GripVertical className="w-5 h-5" />
+        <GripVertical className="w-4 h-4" />
       </button>
       
-      <div className="p-3 rounded-xl bg-red-500/20 text-red-400">
-        <FileText className="w-6 h-6" />
+      <div className="p-2 rounded-lg bg-red-500/20 text-red-500 dark:text-red-400">
+        <FileText className="w-4 h-4" />
       </div>
       
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-white truncate">{pdf.name}</p>
-        <p className="text-sm text-zinc-500">{formatSize(pdf.size)}</p>
+        <p className="text-sm font-medium text-slate-800 dark:text-white truncate">{pdf.name}</p>
+        <p className="text-xs text-slate-500 dark:text-white/40">{formatSize(pdf.size)}</p>
       </div>
       
       <button
         onClick={() => onRemove(pdf.id)}
-        className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+        className="p-1.5 rounded-lg text-slate-400 dark:text-white/30 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
       >
         <Trash2 className="w-4 h-4" />
       </button>
-    </div>
+    </motion.div>
   );
 }
 
 export default function MergePDFPage() {
+  // File state
   const [pdfs, setPdfs] = useState<PDFFile[]>([]);
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<{ url: string; name: string; size: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // File Controls
+  const [autoSort, setAutoSort] = useState<'none' | 'name' | 'size' | 'date'>('none');
   
-  // Options
-  const [removeMetadata, setRemoveMetadata] = useState(false);
+  // Merge Options
+  const [mergeMode, setMergeMode] = useState<'all' | 'custom' | 'odd' | 'even'>('all');
+  const [customRange, setCustomRange] = useState('');
+  
+  // Page Cleanup
+  const [removeBlankPages, setRemoveBlankPages] = useState(false);
+  const [removeDuplicates, setRemoveDuplicates] = useState(false);
+  const [autoRotatePages, setAutoRotatePages] = useState(false);
+  
+  // Insert Options
+  const [insertBlankPage, setInsertBlankPage] = useState(false);
+  const [blankPagePosition, setBlankPagePosition] = useState<'start' | 'end' | 'between'>('end');
+  
+  // Output Optimization
+  const [autoCompress, setAutoCompress] = useState(true);
+  const [targetSize, setTargetSize] = useState(0); // 0 = auto
+  const [convertImagesToJPEG, setConvertImagesToJPEG] = useState(false);
+  
+  // Metadata
   const [addBookmarks, setAddBookmarks] = useState(true);
+  const [removeMetadata, setRemoveMetadata] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const files = Array.from(e.dataTransfer.files).filter(f => f.type === 'application/pdf');
-    addFiles(files);
-  }, []);
-
-  const addFiles = (files: File[]) => {
+  const handleFilesChange = (files: File[]) => {
     const newPdfs: PDFFile[] = files.map(file => ({
       id: `${file.name}-${Date.now()}-${Math.random()}`,
       file,
       name: file.name,
       size: file.size,
     }));
-    setPdfs(prev => [...prev, ...newPdfs]);
+    setPdfs(newPdfs);
     setError(null);
-  };
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const files = Array.from(e.target.files).filter(f => f.type === 'application/pdf');
-      addFiles(files);
-    }
+    setResult(null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -125,14 +147,17 @@ export default function MergePDFPage() {
     setPdfs(prev => prev.filter(p => p.id !== id));
   };
 
-  const moveFile = (index: number, direction: 'up' | 'down') => {
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex >= 0 && newIndex < pdfs.length) {
-      setPdfs(prev => arrayMove(prev, index, newIndex));
-    }
+  const sortFiles = (by: 'name' | 'size' | 'date') => {
+    setPdfs(prev => {
+      const sorted = [...prev];
+      if (by === 'name') sorted.sort((a, b) => a.name.localeCompare(b.name));
+      if (by === 'size') sorted.sort((a, b) => a.size - b.size);
+      return sorted;
+    });
+    setAutoSort(by);
   };
 
-  const handleMerge = async () => {
+  const handleMerge = useCallback(async () => {
     if (pdfs.length < 2) {
       setError('Please add at least 2 PDF files to merge');
       return;
@@ -143,34 +168,62 @@ export default function MergePDFPage() {
     setProgress(0);
 
     try {
-      const formData = new FormData();
-      pdfs.forEach(pdf => formData.append('files', pdf.file));
-      formData.append('removeMetadata', String(removeMetadata));
-      formData.append('addBookmarks', String(addBookmarks));
-
-      const progressInterval = setInterval(() => {
-        setProgress(prev => Math.min(prev + 5, 90));
-      }, 200);
-
-      const response = await fetch('/api/tools/merge-pdf', {
-        method: 'POST',
-        body: formData,
+      // Create a new PDF document to merge into
+      const mergedPdf = await PDFDocument.create();
+      
+      // Process each PDF
+      for (let i = 0; i < pdfs.length; i++) {
+        setProgress(Math.round((i / pdfs.length) * 80));
+        
+        const pdfFile = pdfs[i]!;
+        const arrayBuffer = await pdfFile.file.arrayBuffer();
+        
+        try {
+          const pdfDoc = await PDFDocument.load(arrayBuffer, { 
+            ignoreEncryption: true 
+          });
+          
+          // Copy all pages from this PDF
+          const pages = await mergedPdf.copyPages(pdfDoc, pdfDoc.getPageIndices());
+          pages.forEach(page => mergedPdf.addPage(page));
+        } catch (loadErr) {
+          console.error(`Error loading PDF ${pdfFile.name}:`, loadErr);
+          throw new Error(`Failed to load "${pdfFile.name}". It may be corrupted or password-protected.`);
+        }
+      }
+      
+      setProgress(85);
+      
+      // Remove metadata if requested
+      if (removeMetadata) {
+        mergedPdf.setTitle('');
+        mergedPdf.setAuthor('');
+        mergedPdf.setSubject('');
+        mergedPdf.setKeywords([]);
+        mergedPdf.setProducer('');
+        mergedPdf.setCreator('');
+      }
+      
+      setProgress(90);
+      
+      // Save the merged PDF
+      const mergedBytes = await mergedPdf.save({
+        useObjectStreams: autoCompress,
       });
-
-      clearInterval(progressInterval);
+      
       setProgress(100);
-
-      if (!response.ok) throw new Error('Failed to merge PDFs');
-
-      const blob = await response.blob();
+      
+      // Create blob and URL
+      const blob = new Blob([new Uint8Array(mergedBytes)], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       setResult({ url, name: 'merged.pdf', size: blob.size });
     } catch (err: any) {
-      setError(err.message || 'Failed to merge PDFs');
+      console.error('Merge error:', err);
+      setError(err.message || 'Failed to merge PDFs. Please try again.');
     } finally {
       setProcessing(false);
     }
-  };
+  }, [pdfs, removeMetadata, autoCompress]);
 
   const handleDownload = () => {
     if (result) {
@@ -194,200 +247,277 @@ export default function MergePDFPage() {
     return (bytes / 1048576).toFixed(2) + ' MB';
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
-      {/* Header */}
-      <div className="relative overflow-hidden border-b border-zinc-800">
-        <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-orange-500/10 to-amber-500/10" />
-        <div className="relative max-w-5xl mx-auto px-6 py-16">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-red-500 to-orange-500 shadow-lg shadow-red-500/25">
-              <Layers className="w-8 h-8 text-white" />
-            </div>
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-red-500/20 text-red-400 border border-red-500/30">
-              PDF TOOL
-            </span>
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-3">Merge PDF Files</h1>
-          <p className="text-lg text-zinc-400 max-w-2xl">
-            Combine multiple PDF documents into a single file. Drag to reorder, then merge with one click.
-          </p>
-        </div>
-      </div>
+  // Settings Panel
+  const settingsPanel = (
+    <>
+      {/* File Controls */}
+      <SettingsSection title="File Controls" icon={<FileText className="w-4 h-4" />}>
+        <SettingsSelect
+          label="Auto-sort files"
+          value={autoSort}
+          onChange={(v) => {
+            if (v !== 'none') sortFiles(v as 'name' | 'size' | 'date');
+            else setAutoSort('none');
+          }}
+          options={[
+            { value: 'none', label: 'Manual order' },
+            { value: 'name', label: 'By name (A-Z)' },
+            { value: 'size', label: 'By size (smallest first)' },
+            { value: 'date', label: 'By date' },
+          ]}
+          icon={<SortAsc className="w-4 h-4" />}
+        />
+      </SettingsSection>
 
-      <main className="max-w-5xl mx-auto px-6 py-12">
-        {!result ? (
-          <div className="space-y-8">
-            {/* Upload Zone */}
-            <div
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
-              className="relative border-2 border-dashed border-zinc-700 hover:border-red-500/50 rounded-2xl p-12 transition-all duration-300 bg-zinc-900/30 hover:bg-red-500/5 group"
-            >
-              <input
-                type="file"
-                accept=".pdf"
-                multiple
-                onChange={handleFileInput}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-              />
-              <div className="text-center">
-                <div className="inline-flex p-4 rounded-2xl bg-zinc-800/50 group-hover:bg-red-500/20 transition-colors mb-4">
-                  <Upload className="w-10 h-10 text-zinc-400 group-hover:text-red-400 transition-colors" />
-                </div>
-                <h3 className="text-xl font-semibold text-white mb-2">Drop PDF files here</h3>
-                <p className="text-zinc-500 mb-4">or click to browse • PDF files only</p>
-                <button className="px-6 py-2.5 rounded-xl bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors font-medium inline-flex items-center gap-2">
-                  <Plus className="w-4 h-4" /> Add PDF Files
-                </button>
-              </div>
-            </div>
-
-            {/* File List with Drag & Drop */}
-            {pdfs.length > 0 && (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-white flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-red-400" />
-                    {pdfs.length} PDF{pdfs.length !== 1 ? 's' : ''} selected
-                  </h3>
-                  <button
-                    onClick={() => setPdfs([])}
-                    className="text-sm text-zinc-500 hover:text-red-400 transition-colors"
-                  >
-                    Clear all
-                  </button>
-                </div>
-
-                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                  <SortableContext items={pdfs.map(p => p.id)} strategy={verticalListSortingStrategy}>
-                    <div className="space-y-2">
-                      {pdfs.map((pdf, index) => (
-                        <SortableItem key={pdf.id} pdf={pdf} onRemove={removeFile} />
-                      ))}
-                    </div>
-                  </SortableContext>
-                </DndContext>
-
-                <p className="text-sm text-zinc-500 text-center">
-                  Drag files to reorder • First file will be first in merged PDF
-                </p>
-              </div>
-            )}
-
-            {/* Options */}
-            {pdfs.length > 0 && (
-              <div className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800">
-                <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
-                  <Settings2 className="w-5 h-5 text-amber-400" />
-                  Merge Options
-                </h3>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <label className="flex items-center gap-3 p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50 cursor-pointer hover:border-zinc-600 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={addBookmarks}
-                      onChange={(e) => setAddBookmarks(e.target.checked)}
-                      className="w-5 h-5 rounded border-zinc-600 text-amber-500 focus:ring-amber-500/20"
-                    />
-                    <div>
-                      <div className="flex items-center gap-2 text-white font-medium">
-                        <Bookmark className="w-4 h-4 text-amber-400" />
-                        Add Bookmarks
-                      </div>
-                      <p className="text-sm text-zinc-500">Create bookmarks for each file</p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-center gap-3 p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50 cursor-pointer hover:border-zinc-600 transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={removeMetadata}
-                      onChange={(e) => setRemoveMetadata(e.target.checked)}
-                      className="w-5 h-5 rounded border-zinc-600 text-amber-500 focus:ring-amber-500/20"
-                    />
-                    <div>
-                      <div className="flex items-center gap-2 text-white font-medium">
-                        <FileX className="w-4 h-4 text-amber-400" />
-                        Remove Metadata
-                      </div>
-                      <p className="text-sm text-zinc-500">Strip document metadata</p>
-                    </div>
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* Error */}
-            {error && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p>{error}</p>
-              </div>
-            )}
-
-            {/* Merge Button */}
-            <button
-              onClick={handleMerge}
-              disabled={pdfs.length < 2 || processing}
-              className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-3 ${
-                pdfs.length < 2 || processing
-                  ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                  : 'bg-gradient-to-r from-red-500 to-orange-500 text-white hover:shadow-lg hover:shadow-red-500/25 hover:scale-[1.02] active:scale-[0.98]'
-              }`}
-            >
-              {processing ? (
-                <>
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  Merging... {progress}%
-                </>
-              ) : (
-                <>
-                  <Layers className="w-6 h-6" />
-                  Merge {pdfs.length} PDF Files
-                </>
-              )}
-            </button>
-
-            {/* Progress */}
-            {processing && (
-              <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-red-500 to-orange-500 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            )}
-          </div>
-        ) : (
-          /* Success State */
-          <div className="text-center py-12 space-y-6">
-            <div className="inline-flex p-6 rounded-3xl bg-green-500/20 mb-4">
-              <CheckCircle2 className="w-16 h-16 text-green-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-white">PDFs Merged Successfully!</h2>
-            <p className="text-zinc-400">
-              {pdfs.length} files combined • {formatSize(result.size)}
-            </p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-              <button
-                onClick={handleDownload}
-                className="px-8 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold hover:shadow-lg hover:shadow-green-500/25 transition-all inline-flex items-center justify-center gap-2"
-              >
-                <Download className="w-5 h-5" />
-                Download Merged PDF
-              </button>
-              <button
-                onClick={reset}
-                className="px-8 py-4 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700 transition-colors"
-              >
-                Merge More PDFs
-              </button>
-            </div>
+      {/* Merge Options */}
+      <SettingsSection title="Merge Options" icon={<Layers className="w-4 h-4" />}>
+        <SettingsButtonGroup
+          label="Merge Mode"
+          value={mergeMode}
+          onChange={(v) => setMergeMode(v as typeof mergeMode)}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'custom', label: 'Range' },
+            { value: 'odd', label: 'Odd' },
+            { value: 'even', label: 'Even' },
+          ]}
+        />
+        
+        {mergeMode === 'custom' && (
+          <div className="mt-3">
+            <input
+              type="text"
+              value={customRange}
+              onChange={(e) => setCustomRange(e.target.value)}
+              placeholder="e.g., 1-5, 8, 10-15"
+              className="w-full px-3 py-2 bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-800 dark:text-white/90
+                placeholder:text-slate-400 dark:placeholder:text-white/30 focus:outline-none focus:border-brand-500/50 dark:focus:border-amber-500/50"
+            />
           </div>
         )}
-      </main>
-    </div>
+      </SettingsSection>
+
+      {/* Page Cleanup */}
+      <SettingsSection title="Page Cleanup" icon={<Scissors className="w-4 h-4" />} defaultOpen={false}>
+        <SettingsToggle
+          label="Remove blank pages"
+          description="Auto-detect and remove empty pages"
+          checked={removeBlankPages}
+          onChange={setRemoveBlankPages}
+        />
+        <SettingsToggle
+          label="Remove duplicates"
+          description="Detect and remove duplicate pages"
+          checked={removeDuplicates}
+          onChange={setRemoveDuplicates}
+        />
+        <SettingsToggle
+          label="Auto-rotate pages"
+          description="Fix page orientation automatically"
+          checked={autoRotatePages}
+          onChange={setAutoRotatePages}
+          icon={<RotateCw className="w-3 h-3" />}
+        />
+      </SettingsSection>
+
+      {/* Insert Options */}
+      <SettingsSection title="Insert Options" icon={<Plus className="w-4 h-4" />} defaultOpen={false}>
+        <SettingsToggle
+          label="Insert blank page"
+          description="Add blank pages at specified position"
+          checked={insertBlankPage}
+          onChange={setInsertBlankPage}
+        />
+        {insertBlankPage && (
+          <SettingsSelect
+            label="Blank page position"
+            value={blankPagePosition}
+            onChange={(v) => setBlankPagePosition(v as typeof blankPagePosition)}
+            options={[
+              { value: 'start', label: 'At start' },
+              { value: 'end', label: 'At end' },
+              { value: 'between', label: 'Between each file' },
+            ]}
+          />
+        )}
+      </SettingsSection>
+
+      {/* Output Optimization */}
+      <SettingsSection title="Output Optimization" icon={<Minimize2 className="w-4 h-4" />} defaultOpen={false}>
+        <SettingsToggle
+          label="Auto compress"
+          description="Optimize output file size"
+          checked={autoCompress}
+          onChange={setAutoCompress}
+        />
+        <SettingsSlider
+          label="Target size"
+          value={targetSize}
+          onChange={setTargetSize}
+          min={0}
+          max={50}
+          unit=" MB"
+        />
+        <p className="text-xs text-slate-400 dark:text-white/30">0 = auto (best quality)</p>
+        <SettingsToggle
+          label="Convert images to JPEG"
+          description="Reduce file size by converting embedded images"
+          checked={convertImagesToJPEG}
+          onChange={setConvertImagesToJPEG}
+          icon={<FileImage className="w-3 h-3" />}
+        />
+      </SettingsSection>
+
+      {/* Metadata */}
+      <SettingsSection title="Metadata" icon={<Bookmark className="w-4 h-4" />} defaultOpen={false}>
+        <SettingsToggle
+          label="Add bookmarks"
+          description="Create bookmarks for each merged file"
+          checked={addBookmarks}
+          onChange={setAddBookmarks}
+          icon={<Bookmark className="w-3 h-3" />}
+        />
+        <SettingsToggle
+          label="Remove metadata"
+          description="Strip all document metadata"
+          checked={removeMetadata}
+          onChange={setRemoveMetadata}
+          icon={<FileX className="w-3 h-3" />}
+        />
+      </SettingsSection>
+    </>
+  );
+
+  return (
+    <ToolWorkspaceLayout
+      toolName="Merge PDF"
+      toolIcon={<Layers className="w-5 h-5 text-white" />}
+      toolColor="from-red-500 to-orange-500"
+      settingsPanel={settingsPanel}
+      actionButton={{
+        label: `Merge ${pdfs.length} PDF${pdfs.length !== 1 ? 's' : ''}`,
+        onClick: handleMerge,
+        disabled: pdfs.length < 2,
+        loading: processing,
+        loadingText: `Merging... ${progress}%`,
+        icon: <Layers className="w-5 h-5" />,
+      }}
+    >
+      {!result ? (
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* File Dropzone */}
+          <FileDropzone
+            files={pdfs.map(p => p.file)}
+            onFilesChange={handleFilesChange}
+            accept=".pdf,application/pdf"
+            multiple={true}
+            maxFiles={50}
+            title="Drop PDF files here"
+            description="or click to browse • PDF files only"
+            icon={<FileText className="w-8 h-8" />}
+            accentColor="red"
+            disabled={processing}
+          />
+
+          {/* Sortable File List */}
+          {pdfs.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-slate-700 dark:text-white/80 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-red-500 dark:text-red-400" />
+                  {pdfs.length} PDF{pdfs.length !== 1 ? 's' : ''} selected
+                </h3>
+                <button
+                  onClick={() => setPdfs([])}
+                  className="text-sm text-slate-400 dark:text-white/40 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                >
+                  Clear all
+                </button>
+              </div>
+
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={pdfs.map(p => p.id)} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-2">
+                    <AnimatePresence mode="popLayout">
+                      {pdfs.map((pdf) => (
+                        <SortableItem key={pdf.id} pdf={pdf} onRemove={removeFile} />
+                      ))}
+                    </AnimatePresence>
+                  </div>
+                </SortableContext>
+              </DndContext>
+
+              <p className="text-xs text-slate-400 dark:text-white/30 text-center">
+                Drag files to reorder • First file will be first in merged PDF
+              </p>
+            </div>
+          )}
+
+          {/* Error */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm"
+              >
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Progress */}
+          {processing && (
+            <div className="space-y-2">
+              <div className="w-full h-2 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-red-500 to-orange-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.3 }}
+                />
+              </div>
+              <p className="text-xs text-slate-500 dark:text-white/40 text-center">Processing your PDFs...</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Success State */
+        <div className="max-w-lg mx-auto text-center py-12 space-y-6">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="inline-flex p-6 rounded-3xl bg-green-500/20"
+          >
+            <CheckCircle2 className="w-16 h-16 text-green-500 dark:text-green-400" />
+          </motion.div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">PDFs Merged Successfully!</h2>
+            <p className="text-slate-600 dark:text-white/60">
+              {pdfs.length} files combined • {formatSize(result.size)}
+            </p>
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+            <button
+              onClick={handleDownload}
+              className="px-8 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold 
+                hover:shadow-lg hover:shadow-green-500/25 transition-all inline-flex items-center justify-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+              Download Merged PDF
+            </button>
+            <button
+              onClick={reset}
+              className="px-8 py-4 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-white/70 font-semibold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+            >
+              Merge More PDFs
+            </button>
+          </div>
+        </div>
+      )}
+    </ToolWorkspaceLayout>
   );
 }

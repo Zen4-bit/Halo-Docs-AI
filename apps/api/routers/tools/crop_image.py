@@ -15,12 +15,22 @@ router = APIRouter(prefix="/crop-image", tags=["Media Tools"])
 @router.post("")
 async def crop_image(
     file: UploadFile = File(..., description="Image file to crop"),
-    mode: str = Form("pixels", description="Crop mode: pixels, percentage, center, smart"),
-    x: Optional[int] = Form(0, description="X position (for pixels mode)"),
-    y: Optional[int] = Form(0, description="Y position (for pixels mode)"),
+    x: Optional[int] = Form(0, description="X position"),
+    y: Optional[int] = Form(0, description="Y position"),
     width: Optional[int] = Form(None, description="Crop width"),
     height: Optional[int] = Form(None, description="Crop height"),
-    aspect_ratio: Optional[str] = Form(None, description="Aspect ratio (e.g., '16:9', '4:3', '1:1')"),
+    aspectRatio: str = Form("free", description="Aspect ratio: free, 1:1, 4:3, 16:9, 3:2, custom"),
+    # Transform options
+    rotation: int = Form(0, description="Rotation angle (-180 to 180)"),
+    flipH: bool = Form(False, description="Flip horizontally"),
+    flipV: bool = Form(False, description="Flip vertically"),
+    zoom: int = Form(100, description="Zoom percentage (50-200)"),
+    # Enhancement options
+    autoEnhance: bool = Form(False, description="Auto enhance after crop"),
+    sharpen: bool = Form(False, description="Sharpen image"),
+    # Output options
+    quality: int = Form(90, description="Output quality (1-100)"),
+    outputFormat: str = Form("same", description="Output format: same, jpg, png, webp"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -71,17 +81,33 @@ async def crop_image(
         # Create output file
         output_file = temp_manager.create_temp_file(suffix=f"_cropped.{input_ext}")
         
-        # Crop options
+        # Determine mode based on aspect ratio
+        mode = 'smart' if aspectRatio != 'free' else 'pixels'
+        
+        # Determine output format
+        out_format = input_ext.upper() if outputFormat == 'same' else outputFormat.upper()
+        if out_format == 'JPG':
+            out_format = 'JPEG'
+        
+        # Crop options with all settings
         options = {
             'mode': mode,
             'x': x,
             'y': y,
             'width': width,
             'height': height,
-            'aspect_ratio': aspect_ratio
+            'aspect_ratio': aspectRatio if aspectRatio != 'free' else None,
+            'rotation': rotation,
+            'flip_horizontal': flipH,
+            'flip_vertical': flipV,
+            'zoom': zoom,
+            'auto_enhance': autoEnhance,
+            'sharpen': sharpen,
+            'quality': quality,
+            'format': out_format
         }
         
-        ImageProcessor.crop_image(input_file, output_file, options)
+        ImageProcessor.crop_image_advanced(input_file, output_file, options)
         
         # Output filename
         if not output_filename:

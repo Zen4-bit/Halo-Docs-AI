@@ -19,10 +19,20 @@ router = APIRouter(prefix="/pdf-to-image", tags=["PDF Tools"])
 @router.post("")
 async def pdf_to_image(
     file: UploadFile = File(..., description="PDF file to convert"),
-    format: str = Form("png", description="Output format: 'png', 'jpg', 'webp'"),
-    dpi: int = Form(300, description="Resolution in DPI (72-600)"),
-    quality: int = Form(95, description="JPEG quality (1-100, only for JPG)"),
-    pages: Optional[str] = Form(None, description="Specific pages (comma-separated, e.g., '1,3,5')")
+    # Output Format
+    outputFormat: str = Form("png", description="Output format: png, jpg, webp"),
+    dpi: int = Form(150, description="Resolution in DPI (30-600)"),
+    quality: int = Form(90, description="Quality (1-100)"),
+    # Page Range
+    pageRange: str = Form("", description="Page range, e.g. 1-5, 8, 10-12"),
+    # Image Enhancements
+    autoCrop: bool = Form(False, description="Auto crop whitespace"),
+    deskew: bool = Form(False, description="Deskew scanned pages"),
+    sharpen: bool = Form(False, description="Sharpen image"),
+    denoise: bool = Form(False, description="Reduce noise"),
+    grayscale: bool = Form(False, description="Convert to grayscale"),
+    # Resize
+    resizePercent: int = Form(100, description="Resize percentage (10-200)")
 ):
     """
     Convert PDF pages to image files
@@ -52,7 +62,7 @@ async def pdf_to_image(
         is_valid, error = await FileValidator.validate_pdf(file)
         FileValidator.raise_if_invalid(is_valid, error)
         
-        if format.lower() not in ['png', 'jpg', 'jpeg', 'webp']:
+        if outputFormat.lower() not in ['png', 'jpg', 'jpeg', 'webp']:
             raise HTTPException(status_code=400, detail="Invalid format. Use 'png', 'jpg', or 'webp'")
         
         if not 72 <= dpi <= 600:
@@ -69,20 +79,34 @@ async def pdf_to_image(
         # Create output directory
         output_dir = temp_manager.create_temp_dir(prefix="pdf_images_")
         
-        # Parse pages if specified
+        # Parse page range if specified
         page_list = None
-        if pages:
+        if pageRange:
             try:
-                page_list = [int(p.strip()) - 1 for p in pages.split(',')]  # Convert to 0-indexed
+                pages_to_convert = []
+                for part in pageRange.split(','):
+                    part = part.strip()
+                    if '-' in part:
+                        start, end = part.split('-')
+                        pages_to_convert.extend(range(int(start) - 1, int(end)))
+                    else:
+                        pages_to_convert.append(int(part) - 1)
+                page_list = pages_to_convert
             except ValueError:
-                raise HTTPException(status_code=400, detail="Invalid page numbers")
+                raise HTTPException(status_code=400, detail="Invalid page range")
         
-        # Convert to images
+        # Convert to images with all options
         options = {
-            'format': format.lower(),
+            'format': outputFormat.lower(),
             'dpi': dpi,
             'quality': quality,
-            'pages': page_list
+            'pages': page_list,
+            'auto_crop': autoCrop,
+            'deskew': deskew,
+            'sharpen': sharpen,
+            'denoise': denoise,
+            'grayscale': grayscale,
+            'resize_percent': resizePercent
         }
         
         output_files = PDFProcessor.pdf_to_images(input_file, output_dir, options)

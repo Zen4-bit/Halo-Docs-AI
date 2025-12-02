@@ -144,7 +144,7 @@ export const InteractiveHero: React.FC = memo(() => {
   return (
     <section
       ref={containerRef}
-      className="relative min-h-screen overflow-hidden bg-background flex items-center justify-center perspective-1000 py-20"
+      className="relative min-h-screen overflow-hidden bg-background flex items-center justify-center perspective-1000 py-12 md:py-20"
     >
       {/* 3D Parallax Background System Removed */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -154,10 +154,10 @@ export const InteractiveHero: React.FC = memo(() => {
       {/* Show simple fallback during mount */}
       {!isMounted && (
         <div className="relative z-20 container mx-auto px-4 text-center">
-          <h1 className="text-6xl md:text-8xl font-bold text-text mb-6">
+          <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-bold text-text mb-4 md:mb-6">
             HALO <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-purple-500">AI</span>
           </h1>
-          <p className="text-xl md:text-2xl text-text-secondary max-w-3xl mx-auto">
+          <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-text-secondary max-w-3xl mx-auto px-4">
             Next-Gen Document Intelligence Platform
           </p>
         </div>
@@ -166,7 +166,7 @@ export const InteractiveHero: React.FC = memo(() => {
       {/* Content */}
       {isMounted && (<div className="relative z-20 container mx-auto px-4 text-center">
         {/* Main Story Display with Enhanced 3D Tilt */}
-        <div className="relative min-h-[400px] mb-12 perspective-1000">
+        <div className="relative min-h-[280px] sm:min-h-[340px] md:min-h-[400px] mb-8 md:mb-12 perspective-1000">
           <AnimatePresence mode="wait">
             {(() => {
               const story = stories[currentStory];
@@ -181,12 +181,12 @@ export const InteractiveHero: React.FC = memo(() => {
                   transition={{ duration: 0.6, type: "spring", stiffness: 100 }}
                   className="absolute inset-0 flex flex-col items-center justify-center"
                 >
-                  <TiltCard className="group relative p-12 rounded-[3rem] glass-card border border-white/10 shadow-2xl">
-                    <div className={`w-24 h-24 rounded-3xl bg-gradient-to-br ${story.color} flex items-center justify-center text-white shadow-lg shadow-primary/20 mb-8 mx-auto transform group-hover:scale-110 transition-transform duration-500`}>
+                  <TiltCard className="group relative p-6 sm:p-8 md:p-10 lg:p-12 rounded-2xl md:rounded-[3rem] glass-card border border-white/10 shadow-2xl mx-2">
+                    <div className={`w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 rounded-2xl md:rounded-3xl bg-gradient-to-br ${story.color} flex items-center justify-center text-white shadow-lg shadow-primary/20 mb-4 md:mb-8 mx-auto transform group-hover:scale-110 transition-transform duration-500`}>
                       {story.icon}
                     </div>
 
-                    <h1 className="text-6xl md:text-8xl font-bold text-text mb-6 leading-tight tracking-tight">
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-8xl font-bold text-text mb-3 md:mb-6 leading-tight tracking-tight">
                       {story.title.split(' ').map((word: string, i: number) => (
                         <span key={i} className="inline-block mr-4">
                           {i === 1 ? (
@@ -200,7 +200,7 @@ export const InteractiveHero: React.FC = memo(() => {
                       ))}
                     </h1>
 
-                    <p className="text-xl md:text-2xl text-text-secondary max-w-3xl mx-auto leading-relaxed">
+                    <p className="text-sm sm:text-base md:text-xl lg:text-2xl text-text-secondary max-w-3xl mx-auto leading-relaxed px-2">
                       {story.subtitle}
                     </p>
                   </TiltCard>
@@ -211,7 +211,7 @@ export const InteractiveHero: React.FC = memo(() => {
         </div>
 
         {/* Story Indicators */}
-        <div className="flex items-center justify-center space-x-4 mb-16">
+        <div className="flex items-center justify-center space-x-3 md:space-x-4 mb-8 md:mb-16">
           {stories.map((_: any, index: number) => (
             <button
               key={index}
@@ -229,16 +229,16 @@ export const InteractiveHero: React.FC = memo(() => {
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.4 }}
-          className="flex flex-col sm:flex-row gap-6 justify-center items-center"
+          className="flex flex-col sm:flex-row gap-4 md:gap-6 justify-center items-center px-4"
         >
           <MagneticButton href="/dashboard">
-            <Button variant="primary" size="lg" className="rounded-2xl px-10 py-7 text-xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300" rightIcon={<ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />}>
+            <Button variant="primary" size="lg" className="rounded-xl md:rounded-2xl px-6 py-4 md:px-10 md:py-7 text-base md:text-xl shadow-xl hover:shadow-2xl hover:scale-105 transition-all duration-300 w-full sm:w-auto" rightIcon={<ArrowRight className="w-5 h-5 md:w-6 md:h-6 group-hover:translate-x-1 transition-transform" />}>
               Start Your Journey
             </Button>
           </MagneticButton>
 
           <MagneticButton href="/tools">
-            <Button variant="secondary" size="lg" className="rounded-2xl px-10 py-7 text-xl hover:bg-surface-highlight/80" rightIcon={<MousePointer2 className="w-6 h-6 opacity-60" />}>
+            <Button variant="secondary" size="lg" className="rounded-xl md:rounded-2xl px-6 py-4 md:px-10 md:py-7 text-base md:text-xl hover:bg-surface-highlight/80 w-full sm:w-auto" rightIcon={<MousePointer2 className="w-5 h-5 md:w-6 md:h-6 opacity-60" />}>
               Explore Features
             </Button>
           </MagneticButton>
@@ -250,7 +250,7 @@ export const InteractiveHero: React.FC = memo(() => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           transition={{ duration: 0.8, delay: 0.6 }}
-          className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-32 max-w-6xl mx-auto"
+          className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mt-16 md:mt-32 max-w-6xl mx-auto px-2"
         >
           {[
             { title: "Lightning Fast", desc: "Process documents in seconds", icon: Zap, color: "text-yellow-500" },
@@ -260,13 +260,13 @@ export const InteractiveHero: React.FC = memo(() => {
             <motion.div
               key={index}
               whileHover={{ y: -10, rotateX: 5, rotateY: 5 }}
-              className="group glass-card p-8 rounded-3xl transition-all duration-500 text-left perspective-500"
+              className="group glass-card p-5 md:p-8 rounded-2xl md:rounded-3xl transition-all duration-500 text-left perspective-500"
             >
-              <div className={`w-14 h-14 bg-surface-highlight rounded-2xl flex items-center justify-center ${feature.color} mb-6 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-lg`}>
-                <feature.icon className="w-7 h-7" />
+              <div className={`w-12 h-12 md:w-14 md:h-14 bg-surface-highlight rounded-xl md:rounded-2xl flex items-center justify-center ${feature.color} mb-4 md:mb-6 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 shadow-lg`}>
+                <feature.icon className="w-6 h-6 md:w-7 md:h-7" />
               </div>
-              <h3 className="text-xl font-bold text-text mb-3 group-hover:text-primary transition-colors">{feature.title}</h3>
-              <p className="text-text-secondary text-base leading-relaxed">{feature.desc}</p>
+              <h3 className="text-lg md:text-xl font-bold text-text mb-2 md:mb-3 group-hover:text-primary transition-colors">{feature.title}</h3>
+              <p className="text-text-secondary text-sm md:text-base leading-relaxed">{feature.desc}</p>
             </motion.div>
           ))}
         </motion.div>

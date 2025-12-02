@@ -1,6 +1,6 @@
 """
 Image Compressor Tool Endpoint
-Compress images with quality control
+Compress images with quality control and enhancements
 """
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from typing import Optional
@@ -15,12 +15,18 @@ router = APIRouter(prefix="/image-compressor", tags=["Media Tools"])
 @router.post("")
 async def compress_image(
     file: UploadFile = File(..., description="Image file to compress"),
-    quality: int = Form(85, description="Compression quality (1-100)"),
-    format: Optional[str] = Form(None, description="Output format: png, jpg, webp (default: same as input)"),
-    max_width: Optional[int] = Form(None, description="Maximum width (resize if larger)"),
-    max_height: Optional[int] = Form(None, description="Maximum height (resize if larger)"),
-    progressive: bool = Form(True, description="Progressive JPEG (for jpg)"),
-    strip_metadata: bool = Form(True, description="Remove EXIF data"),
+    quality: int = Form(80, description="Compression quality (1-100)"),
+    outputFormat: Optional[str] = Form(None, description="Output format: png, jpeg, webp, avif"),
+    targetSize: int = Form(0, description="Target file size in MB (0 = ignore)"),
+    resizePercent: int = Form(100, description="Resize percentage (10-200)"),
+    autoEnhance: bool = Form(False, description="Auto enhance image"),
+    denoise: bool = Form(False, description="Reduce noise"),
+    sharpen: bool = Form(False, description="Sharpen image"),
+    brightness: int = Form(0, description="Brightness adjustment (-50 to 50)"),
+    contrast: int = Form(0, description="Contrast adjustment (-50 to 50)"),
+    removeExif: bool = Form(True, description="Remove EXIF metadata"),
+    keepGps: bool = Form(False, description="Keep GPS data if removeExif is false"),
+    colorProfile: str = Form("srgb", description="Color profile: srgb, adobe, p3"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -59,6 +65,7 @@ async def compress_image(
             raise HTTPException(status_code=400, detail="Quality must be between 1 and 100")
         
         # Determine output format
+        format = outputFormat
         if not format:
             format = file.filename.split('.')[-1].lower()
         format = format.upper() if format.lower() in ['jpeg', 'jpg'] else format.upper()
@@ -74,18 +81,34 @@ async def compress_image(
         output_ext = format.lower() if format.lower() != 'jpeg' else 'jpg'
         output_file = temp_manager.create_temp_file(suffix=f"_compressed.{output_ext}")
         
-        # Compress image
+        # Build compression options with all settings
         options = {
             'quality': quality,
             'format': format,
-            'progressive': progressive,
+            'progressive': True,
             'optimize': True,
-            'max_width': max_width,
-            'max_height': max_height,
-            'strip_metadata': strip_metadata
+            'strip_metadata': removeExif,
+            'keep_gps': keepGps,
+            'resize_percent': resizePercent,
+            'auto_enhance': autoEnhance,
+            'denoise': denoise,
+            'sharpen': sharpen,
+            'brightness': brightness,
+            'contrast': contrast,
+            'color_profile': colorProfile,
+            'target_size_mb': targetSize
         }
         
-        ImageProcessor.compress_image(input_file, output_file, options)
+        ImageProcessor.compress_image_advanced(input_file, output_file, options)
+        
+        # If target size is set, iteratively compress until under target
+        if targetSize > 0:
+            target_bytes = targetSize * 1024 * 1024
+            current_quality = quality
+            while output_file.stat().st_size > target_bytes and current_quality > 10:
+                current_quality -= 10
+                options['quality'] = current_quality
+                ImageProcessor.compress_image_advanced(input_file, output_file, options)
         
         # Calculate compression ratio
         compressed_size = output_file.stat().st_size

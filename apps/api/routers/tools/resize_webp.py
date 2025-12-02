@@ -17,9 +17,13 @@ async def resize_webp(
     file: UploadFile = File(..., description="WebP file to resize"),
     width: Optional[int] = Form(None, description="Target width"),
     height: Optional[int] = Form(None, description="Target height"),
-    mode: str = Form("fit", description="Resize mode: fit, fill, stretch, thumbnail"),
-    maintain_aspect: bool = Form(True, description="Maintain aspect ratio"),
-    quality: int = Form(95, description="Output quality (1-100)"),
+    resizeMode: str = Form("fit", description="Resize mode: fit, fill, stretch, exact"),
+    maintainAspect: bool = Form(True, description="Maintain aspect ratio"),
+    quality: int = Form(90, description="Output quality (1-100)"),
+    lossless: bool = Form(False, description="Lossless compression"),
+    preserveTransparency: bool = Form(True, description="Preserve transparency"),
+    sharpen: bool = Form(False, description="Sharpen after resize"),
+    autoEnhance: bool = Form(False, description="Auto enhance"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -63,17 +67,21 @@ async def resize_webp(
         # Create output file
         output_file = temp_manager.create_temp_file(suffix="_resized.webp")
         
-        # Resize options
+        # Resize options with all settings
         options = {
             'width': width,
             'height': height,
-            'mode': mode,
-            'maintain_aspect': maintain_aspect,
+            'mode': resizeMode,
+            'maintain_aspect': maintainAspect,
             'format': 'WEBP',
-            'quality': quality
+            'quality': quality,
+            'lossless': lossless,
+            'preserve_transparency': preserveTransparency,
+            'sharpen': sharpen,
+            'auto_enhance': autoEnhance
         }
         
-        ImageProcessor.resize_image(input_file, output_file, options)
+        ImageProcessor.resize_image_advanced(input_file, output_file, options)
         
         # Output filename
         if not output_filename:

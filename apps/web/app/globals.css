@@ -267,3 +267,163 @@
     content-visibility: auto;
   }
 }
+
+/* === THEME-AWARE TOOL PAGES === */
+@layer components {
+  /* Tool page container - respects theme */
+  .tool-page {
+    @apply min-h-screen;
+    background: rgb(var(--background));
+    color: rgb(var(--text));
+  }
+
+  .tool-page-gradient {
+    @apply min-h-screen;
+    background: linear-gradient(to bottom right, rgb(var(--background)), rgb(var(--surface)), rgb(var(--background)));
+  }
+
+  /* Tool header section */
+  .tool-header {
+    @apply relative overflow-hidden border-b;
+    border-color: rgb(var(--border));
+    background: rgb(var(--surface));
+  }
+
+  /* Tool content cards */
+  .tool-card {
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--border));
+    @apply rounded-2xl transition-all duration-200;
+  }
+
+  .tool-card:hover {
+    border-color: rgb(var(--border-light));
+    background: rgb(var(--surface-highlight));
+  }
+
+  /* Tool input areas */
+  .tool-input {
+    background: rgb(var(--surface));
+    border: 1px solid rgb(var(--border));
+    color: rgb(var(--text));
+    @apply rounded-xl transition-colors;
+  }
+
+  .tool-input:focus {
+    border-color: rgb(var(--primary));
+    @apply outline-none ring-2;
+    --tw-ring-color: rgba(var(--primary), 0.2);
+  }
+
+  .tool-input::placeholder {
+    color: rgb(var(--text-muted));
+  }
+
+  /* Tool upload zones */
+  .tool-upload-zone {
+    @apply border-2 border-dashed rounded-2xl p-12 transition-all duration-300;
+    border-color: rgb(var(--border));
+    background: rgba(var(--surface), 0.3);
+  }
+
+  .tool-upload-zone:hover {
+    border-color: rgb(var(--primary));
+    background: rgba(var(--primary), 0.05);
+  }
+
+  /* Tool text colors */
+  .tool-text {
+    color: rgb(var(--text));
+  }
+
+  .tool-text-secondary {
+    color: rgb(var(--text-secondary));
+  }
+
+  .tool-text-muted {
+    color: rgb(var(--text-muted));
+  }
+
+  /* Tool backgrounds */
+  .tool-bg {
+    background: rgb(var(--background));
+  }
+
+  .tool-bg-surface {
+    background: rgb(var(--surface));
+  }
+
+  .tool-bg-highlight {
+    background: rgb(var(--surface-highlight));
+  }
+
+  /* Tool borders */
+  .tool-border {
+    border-color: rgb(var(--border));
+  }
+
+  /* Custom scrollbar for tool panels */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(100, 116, 139, 0.3);
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(100, 116, 139, 0.5);
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  /* Firefox scrollbar */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+  }
+
+  .dark .custom-scrollbar {
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  }
+
+  /* Hide scrollbar utility */
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Tool workspace dropzone */
+  .tool-dropzone {
+    @apply border-2 border-dashed rounded-2xl p-8 transition-all duration-300;
+    border-color: rgb(var(--border));
+    background: rgba(var(--surface), 0.5);
+  }
+
+  .tool-dropzone:hover,
+  .tool-dropzone.drag-over {
+    border-color: rgb(var(--primary));
+    background: rgba(var(--primary), 0.05);
+  }
+
+  .tool-dropzone.has-files {
+    border-color: rgba(var(--primary), 0.5);
+    background: rgba(var(--primary), 0.03);
+  }
+}

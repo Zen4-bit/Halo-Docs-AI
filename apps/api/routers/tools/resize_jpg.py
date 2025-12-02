@@ -17,9 +17,17 @@ async def resize_jpg(
     file: UploadFile = File(..., description="JPEG file to resize"),
     width: Optional[int] = Form(None, description="Target width"),
     height: Optional[int] = Form(None, description="Target height"),
-    mode: str = Form("fit", description="Resize mode: fit, fill, stretch, thumbnail"),
-    maintain_aspect: bool = Form(True, description="Maintain aspect ratio"),
+    resizeMode: str = Form("fit", description="Resize mode: fit, fill, stretch, exact"),
+    maintainAspect: bool = Form(True, description="Maintain aspect ratio"),
     quality: int = Form(90, description="Output quality (1-100)"),
+    # Enhancement options
+    sharpen: bool = Form(False, description="Sharpen after resize"),
+    autoEnhance: bool = Form(False, description="Auto enhance"),
+    # DPI settings
+    setDpi: bool = Form(False, description="Set custom DPI"),
+    dpi: int = Form(72, description="Target DPI"),
+    # Metadata
+    stripMetadata: bool = Form(True, description="Remove EXIF data"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -63,17 +71,22 @@ async def resize_jpg(
         # Create output file
         output_file = temp_manager.create_temp_file(suffix="_resized.jpg")
         
-        # Resize options
+        # Resize options with all settings
         options = {
             'width': width,
             'height': height,
-            'mode': mode,
-            'maintain_aspect': maintain_aspect,
+            'mode': resizeMode,
+            'maintain_aspect': maintainAspect,
             'format': 'JPEG',
-            'quality': quality
+            'quality': quality,
+            'sharpen': sharpen,
+            'auto_enhance': autoEnhance,
+            'set_dpi': setDpi,
+            'dpi': dpi,
+            'strip_metadata': stripMetadata
         }
         
-        ImageProcessor.resize_image(input_file, output_file, options)
+        ImageProcessor.resize_image_advanced(input_file, output_file, options)
         
         # Output filename
         if not output_filename:

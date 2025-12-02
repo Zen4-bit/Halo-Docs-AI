@@ -1,15 +1,12 @@
 import type { Metadata } from 'next';
-import { Suspense } from 'react';
 import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { Providers } from './providers';
-import { PageLoadingOverlay } from '@/components/PageLoading';
-import PageTransition from '@/components/PageTransition';
 import { CommandPalette } from '@/components/CommandPalette';
 import { Global3DBackground, Global3DContent } from '@/components/Global3DLayout';
 import SmoothScroll from '@/components/SmoothScroll';
-
 import { Navigation } from '@/components/Navigation';
+import { MainContent } from '@/components/MainContent';
 import { ActiveFileProvider } from '@/context/ActiveFileContext';
 
 const inter = Inter({
@@ -61,11 +58,7 @@ export default function RootLayout({
                 <Navigation />
 
                 <Global3DContent>
-                  <main id="main-content" className="flex-1">
-                    <Suspense fallback={<PageLoadingOverlay label="Loading page" />}>
-                      <PageTransition>{children}</PageTransition>
-                    </Suspense>
-                  </main>
+                  <MainContent>{children}</MainContent>
                 </Global3DContent>
               </div>
             </ActiveFileProvider>

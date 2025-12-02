@@ -15,8 +15,14 @@ router = APIRouter(prefix="/png-compressor", tags=["Media Tools"])
 @router.post("")
 async def compress_png(
     file: UploadFile = File(..., description="PNG file to compress"),
-    quality: int = Form(90, description="Compression quality (1-100)"),
-    strip_metadata: bool = Form(True, description="Remove metadata"),
+    compressionLevel: int = Form(9, description="Compression level (1-9)"),
+    targetSize: int = Form(0, description="Target file size in KB (0 = ignore)"),
+    resizePercent: int = Form(100, description="Resize percentage (10-200)"),
+    preserveTransparency: bool = Form(True, description="Preserve transparency"),
+    reduceColors: bool = Form(False, description="Reduce color palette"),
+    colorCount: int = Form(256, description="Max colors if reducing (2-256)"),
+    interlaced: bool = Form(False, description="Interlaced PNG"),
+    stripMetadata: bool = Form(True, description="Remove metadata"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -59,15 +65,30 @@ async def compress_png(
         # Create output file
         output_file = temp_manager.create_temp_file(suffix="_compressed.png")
         
-        # Compress PNG
+        # Compress PNG with all options
         options = {
-            'quality': quality,
+            'compression_level': compressionLevel,
             'format': 'PNG',
             'optimize': True,
-            'strip_metadata': strip_metadata
+            'strip_metadata': stripMetadata,
+            'preserve_transparency': preserveTransparency,
+            'reduce_colors': reduceColors,
+            'color_count': colorCount,
+            'interlaced': interlaced,
+            'resize_percent': resizePercent,
+            'target_size_kb': targetSize
         }
         
-        ImageProcessor.compress_image(input_file, output_file, options)
+        ImageProcessor.compress_image_advanced(input_file, output_file, options)
+        
+        # If target size is set, iteratively compress
+        if targetSize > 0:
+            target_bytes = targetSize * 1024
+            current_level = compressionLevel
+            while output_file.stat().st_size > target_bytes and current_level < 9:
+                current_level += 1
+                options['compression_level'] = current_level
+                ImageProcessor.compress_image_advanced(input_file, output_file, options)
         
         # Calculate compression
         compressed_size = output_file.stat().st_size

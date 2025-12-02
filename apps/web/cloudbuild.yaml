@@ -1,0 +1,27 @@
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_API_BASE=${_BACKEND_URL}'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/halo-docs-ai-frontend:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/halo-docs-ai-frontend:latest'
+      - '.'
+    timeout: '1200s'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/halo-docs-ai-frontend:latest']
+
+images:
+  - 'gcr.io/$PROJECT_ID/halo-docs-ai-frontend:latest'
+
+substitutions:
+  _BACKEND_URL: 'https://halo-docs-ai-backend-744261391903.us-west1.run.app'
+
+options:
+  machineType: 'E2_HIGHCPU_8'
+  diskSizeGb: 100
+
+timeout: '1800s'

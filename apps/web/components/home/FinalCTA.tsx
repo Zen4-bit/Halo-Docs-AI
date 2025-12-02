@@ -6,7 +6,7 @@ import { ArrowRight, Sparkles, Zap, Shield, Star } from 'lucide-react';
 
 export default function FinalCTA() {
     return (
-        <section className="relative py-32 overflow-hidden">
+        <section className="relative py-16 md:py-24 lg:py-32 overflow-hidden">
             {/* Animated Background */}
             <div className="absolute inset-0 bg-background">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-[url('/grid.svg')] opacity-[0.02] dark:opacity-20 [mask-image:linear-gradient(to_bottom,transparent,black,transparent)]" />
@@ -15,7 +15,7 @@ export default function FinalCTA() {
             </div>
 
             <div className="container mx-auto px-4 max-w-6xl relative z-10">
-                <div className="relative glass-card border border-border rounded-[3rem] p-12 md:p-24 overflow-hidden text-center">
+                <div className="relative glass-card border border-border rounded-2xl md:rounded-[3rem] p-6 sm:p-8 md:p-12 lg:p-24 overflow-hidden text-center">
                     {/* Inner Glow */}
                     <div className="absolute inset-0 bg-gradient-to-b from-surface-highlight to-transparent pointer-events-none" />
 
@@ -31,24 +31,24 @@ export default function FinalCTA() {
                             <span className="text-sm font-medium text-text-secondary">Start Your Journey Today</span>
                         </div>
 
-                        <h2 className="text-5xl md:text-7xl font-bold text-text mb-8 leading-tight tracking-tight">
-                            Ready to Transform Your <br />
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-7xl font-bold text-text mb-4 md:mb-8 leading-tight tracking-tight">
+                            Ready to Transform Your<br className="hidden sm:block" /> 
                             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-pink-500 to-blue-500">
                                 Document Workflow?
                             </span>
                         </h2>
 
-                        <p className="text-xl text-text-secondary max-w-2xl mx-auto mb-12 leading-relaxed">
+                        <p className="text-sm sm:text-base md:text-lg lg:text-xl text-text-secondary max-w-2xl mx-auto mb-8 md:mb-12 leading-relaxed px-2">
                             Join thousands of professionals using HALO AI to automate workflows,
                             save time, and unlock the power of their documents.
                         </p>
 
-                        <div className="flex flex-col sm:flex-row gap-6 justify-center items-center mb-16">
+                        <div className="flex flex-col sm:flex-row gap-4 md:gap-6 justify-center items-center mb-10 md:mb-16 px-4">
                             <Link href="/dashboard">
                                 <motion.button
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
-                                    className="group relative px-8 py-4 bg-gradient-to-r from-primary to-pink-500 rounded-xl font-bold text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all duration-300 flex items-center gap-2"
+                                    className="group relative px-6 py-3 md:px-8 md:py-4 bg-gradient-to-r from-primary to-pink-500 rounded-xl font-bold text-white shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all duration-300 flex items-center gap-2 text-sm md:text-base w-full sm:w-auto justify-center"
                                 >
                                     Get Started Free
                                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -58,7 +58,7 @@ export default function FinalCTA() {
                                 <motion.button
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
-                                    className="px-8 py-4 bg-surface-highlight border border-border rounded-xl font-bold text-text hover:bg-surface transition-all duration-300"
+                                    className="px-6 py-3 md:px-8 md:py-4 bg-surface-highlight border border-border rounded-xl font-bold text-text hover:bg-surface transition-all duration-300 text-sm md:text-base w-full sm:w-auto"
                                 >
                                     Contact Sales
                                 </motion.button>
@@ -66,7 +66,7 @@ export default function FinalCTA() {
                         </div>
 
                         {/* Stats/Trust */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 border-t border-border pt-12 max-w-3xl mx-auto">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 md:gap-8 border-t border-border pt-8 md:pt-12 max-w-3xl mx-auto">
                             {[
                                 { icon: Zap, label: "Processing Speed", value: "10x Faster" },
                                 { icon: Shield, label: "Enterprise Security", value: "SOC 2 Type II" },
@@ -83,7 +83,7 @@ export default function FinalCTA() {
                                     <div className="p-2 rounded-full bg-surface-highlight mb-2">
                                         <stat.icon className="w-5 h-5 text-text-muted" />
                                     </div>
-                                    <div className="text-2xl font-bold text-text">{stat.value}</div>
+                                    <div className="text-xl md:text-2xl font-bold text-text">{stat.value}</div>
                                     <div className="text-sm text-text-muted">{stat.label}</div>
                                 </motion.div>
                             ))}

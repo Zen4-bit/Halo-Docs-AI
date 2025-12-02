@@ -1,6 +1,6 @@
 """
 Crop PNG Tool Endpoint
-Specialized PNG cropping with transparency preservation
+Specialized PNG cropping with transforms
 """
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from typing import Optional
@@ -15,12 +15,17 @@ router = APIRouter(prefix="/crop-png", tags=["Media Tools"])
 @router.post("")
 async def crop_png(
     file: UploadFile = File(..., description="PNG file to crop"),
-    mode: str = Form("pixels", description="Crop mode: pixels, percentage, center, smart"),
     x: Optional[int] = Form(0, description="X position"),
     y: Optional[int] = Form(0, description="Y position"),
     width: Optional[int] = Form(None, description="Crop width"),
     height: Optional[int] = Form(None, description="Crop height"),
-    aspect_ratio: Optional[str] = Form(None, description="Aspect ratio (for smart mode)"),
+    aspectRatio: str = Form("free", description="Aspect ratio: free, 1:1, 4:3, 16:9, custom"),
+    rotation: int = Form(0, description="Rotation angle (-180 to 180)"),
+    flipH: bool = Form(False, description="Flip horizontally"),
+    flipV: bool = Form(False, description="Flip vertically"),
+    zoom: int = Form(100, description="Zoom percentage (50-200)"),
+    preserveTransparency: bool = Form(True, description="Preserve transparency"),
+    edgeSmoothing: bool = Form(False, description="Apply edge smoothing"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -59,18 +64,27 @@ async def crop_png(
         # Create output file
         output_file = temp_manager.create_temp_file(suffix="_cropped.png")
         
-        # Crop options
+        # Determine crop mode based on aspect ratio
+        mode = 'smart' if aspectRatio != 'free' else 'pixels'
+        
+        # Crop options with all settings
         options = {
             'mode': mode,
             'x': x,
             'y': y,
             'width': width,
             'height': height,
-            'aspect_ratio': aspect_ratio,
-            'format': 'PNG'
+            'aspect_ratio': aspectRatio if aspectRatio != 'free' else None,
+            'format': 'PNG',
+            'rotation': rotation,
+            'flip_horizontal': flipH,
+            'flip_vertical': flipV,
+            'zoom': zoom,
+            'preserve_transparency': preserveTransparency,
+            'edge_smoothing': edgeSmoothing
         }
         
-        ImageProcessor.crop_image(input_file, output_file, options)
+        ImageProcessor.crop_image_advanced(input_file, output_file, options)
         
         # Output filename
         if not output_filename:

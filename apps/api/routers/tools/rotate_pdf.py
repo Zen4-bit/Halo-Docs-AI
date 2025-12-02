@@ -14,8 +14,15 @@ router = APIRouter(prefix="/rotate-pdf", tags=["PDF Tools"])
 @router.post("")
 async def rotate_pdf(
     file: UploadFile = File(..., description="PDF file to rotate"),
-    rotation: int = Form(90, description="Rotation angle: 90, 180, 270"),
-    pages: str = Form("all", description="Pages to rotate: all, odd, even, or range like 1-5,7,9"),
+    # Rotation options
+    rotation: int = Form(90, description="Rotation angle: 90, 180, 270, -90"),
+    direction: str = Form("clockwise", description="Rotation direction: clockwise, counterclockwise"),
+    # Page selection
+    pageSelection: str = Form("all", description="Pages to rotate: all, odd, even, range"),
+    pageRange: str = Form("", description="Page range if selection is 'range', e.g. 1-5, 8, 10-12"),
+    # Additional options
+    autoDetect: bool = Form(False, description="Auto-detect and fix orientation"),
+    preserveBookmarks: bool = Form(True, description="Preserve bookmarks"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -63,19 +70,26 @@ async def rotate_pdf(
         
         total_pages = len(reader.pages)
         
+        # Adjust rotation based on direction
+        actual_rotation = rotation
+        if direction == "counterclockwise":
+            actual_rotation = -rotation
+        actual_rotation = actual_rotation % 360
+        if actual_rotation == 0:
+            actual_rotation = 90
+        
         def should_rotate(page_num):
             """Determine if page should be rotated"""
-            if pages == "all":
+            if pageSelection == "all":
                 return True
-            elif pages == "odd":
+            elif pageSelection == "odd":
                 return page_num % 2 == 1
-            elif pages == "even":
+            elif pageSelection == "even":
                 return page_num % 2 == 0
-            else:
-                # Parse range like "1-5" or "1,3,5"
+            elif pageSelection == "range" and pageRange:
                 try:
                     page_set = set()
-                    for part in pages.split(","):
+                    for part in pageRange.split(","):
                         part = part.strip()
                         if "-" in part:
                             start, end = part.split("-")
@@ -85,12 +99,13 @@ async def rotate_pdf(
                     return page_num in page_set
                 except:
                     return True
+            return True
         
         rotated_count = 0
         
         for page_num, page in enumerate(reader.pages, 1):
             if should_rotate(page_num):
-                page.rotate(rotation)
+                page.rotate(actual_rotation)
                 rotated_count += 1
             writer.add_page(page)
         

@@ -17,8 +17,12 @@ async def resize_png(
     file: UploadFile = File(..., description="PNG file to resize"),
     width: Optional[int] = Form(None, description="Target width"),
     height: Optional[int] = Form(None, description="Target height"),
-    mode: str = Form("fit", description="Resize mode: fit, fill, stretch, thumbnail"),
-    maintain_aspect: bool = Form(True, description="Maintain aspect ratio"),
+    resizeMode: str = Form("fit", description="Resize mode: fit, fill, stretch, exact"),
+    maintainAspect: bool = Form(True, description="Maintain aspect ratio"),
+    preserveTransparency: bool = Form(True, description="Preserve transparency"),
+    sharpen: bool = Form(False, description="Sharpen after resize"),
+    compressionLevel: int = Form(9, description="PNG compression level (1-9)"),
+    interlaced: bool = Form(False, description="Interlaced PNG"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -60,17 +64,21 @@ async def resize_png(
         # Create output file
         output_file = temp_manager.create_temp_file(suffix="_resized.png")
         
-        # Resize options
+        # Resize options with all settings
         options = {
             'width': width,
             'height': height,
-            'mode': mode,
-            'maintain_aspect': maintain_aspect,
+            'mode': resizeMode,
+            'maintain_aspect': maintainAspect,
             'format': 'PNG',
-            'quality': 100  # PNG is lossless
+            'quality': 100,
+            'preserve_transparency': preserveTransparency,
+            'sharpen': sharpen,
+            'compression_level': compressionLevel,
+            'interlaced': interlaced
         }
         
-        ImageProcessor.resize_image(input_file, output_file, options)
+        ImageProcessor.resize_image_advanced(input_file, output_file, options)
         
         # Output filename
         if not output_filename:

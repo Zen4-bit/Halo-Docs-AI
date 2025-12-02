@@ -15,13 +15,20 @@ router = APIRouter(prefix="/crop-webp", tags=["Media Tools"])
 @router.post("")
 async def crop_webp(
     file: UploadFile = File(..., description="WebP file to crop"),
-    mode: str = Form("pixels", description="Crop mode: pixels, percentage, center, smart"),
     x: Optional[int] = Form(0, description="X position"),
     y: Optional[int] = Form(0, description="Y position"),
     width: Optional[int] = Form(None, description="Crop width"),
     height: Optional[int] = Form(None, description="Crop height"),
-    aspect_ratio: Optional[str] = Form(None, description="Aspect ratio (for smart mode)"),
-    quality: int = Form(95, description="Output quality (1-100)"),
+    aspectRatio: str = Form("free", description="Aspect ratio: free, 1:1, 4:3, 16:9, custom"),
+    rotation: int = Form(0, description="Rotation angle (-180 to 180)"),
+    flipH: bool = Form(False, description="Flip horizontally"),
+    flipV: bool = Form(False, description="Flip vertically"),
+    zoom: int = Form(100, description="Zoom percentage (50-200)"),
+    quality: int = Form(90, description="Output quality (1-100)"),
+    lossless: bool = Form(False, description="Lossless compression"),
+    keepAnimation: bool = Form(True, description="Keep animation frames"),
+    flattenAnimation: bool = Form(False, description="Flatten animation"),
+    convertToStill: bool = Form(False, description="Convert to still image"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -58,19 +65,30 @@ async def crop_webp(
         # Create output file
         output_file = temp_manager.create_temp_file(suffix="_cropped.webp")
         
-        # Crop options
+        # Determine crop mode based on aspect ratio
+        mode = 'smart' if aspectRatio != 'free' else 'pixels'
+        
+        # Crop options with all settings
         options = {
             'mode': mode,
             'x': x,
             'y': y,
             'width': width,
             'height': height,
-            'aspect_ratio': aspect_ratio,
+            'aspect_ratio': aspectRatio if aspectRatio != 'free' else None,
             'format': 'WEBP',
-            'quality': quality
+            'quality': quality,
+            'rotation': rotation,
+            'flip_horizontal': flipH,
+            'flip_vertical': flipV,
+            'zoom': zoom,
+            'lossless': lossless,
+            'keep_animation': keepAnimation,
+            'flatten_animation': flattenAnimation,
+            'convert_to_still': convertToStill
         }
         
-        ImageProcessor.crop_image(input_file, output_file, options)
+        ImageProcessor.crop_image_advanced(input_file, output_file, options)
         
         # Output filename
         if not output_filename:

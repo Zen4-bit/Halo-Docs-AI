@@ -15,11 +15,24 @@ router = APIRouter(prefix="/compress-pdf", tags=["PDF Tools"])
 @router.post("")
 async def compress_pdf(
     file: UploadFile = File(..., description="PDF file to compress"),
-    quality: str = Form("medium", description="Compression quality: 'low', 'medium', 'high', 'max'"),
-    remove_metadata: bool = Form(True, description="Remove metadata to reduce size"),
-    remove_annotations: bool = Form(False, description="Remove annotations and comments"),
-    grayscale: bool = Form(False, description="Convert to grayscale for smaller size"),
-    output_filename: Optional[str] = Form("compressed.pdf", description="Output filename")
+    # Compression level
+    compressionLevel: str = Form("medium", description="Compression level: low, medium, high, maximum"),
+    targetSize: int = Form(0, description="Target file size in KB (0 = ignore)"),
+    # Image options
+    imageQuality: int = Form(80, description="Image quality (1-100)"),
+    downsampleImages: bool = Form(True, description="Downsample high-res images"),
+    maxImageDpi: int = Form(150, description="Max image DPI"),
+    # Content removal
+    removeMetadata: bool = Form(True, description="Remove metadata"),
+    removeAnnotations: bool = Form(False, description="Remove annotations"),
+    removeBookmarks: bool = Form(False, description="Remove bookmarks"),
+    removeForms: bool = Form(False, description="Flatten form fields"),
+    removeJavaScript: bool = Form(True, description="Remove JavaScript"),
+    # Color options
+    grayscale: bool = Form(False, description="Convert to grayscale"),
+    # Optimization
+    linearize: bool = Form(True, description="Optimize for web viewing"),
+    output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
     Compress PDF file with quality control
@@ -54,15 +67,28 @@ async def compress_pdf(
         # Create output file
         output_file = temp_manager.create_temp_file(suffix="_compressed.pdf")
         
-        # Compress PDF
+        # Compress PDF with all options
         options = {
-            'quality': quality,
-            'remove_metadata': remove_metadata,
-            'remove_annotations': remove_annotations,
-            'grayscale': grayscale
+            'compression_level': compressionLevel,
+            'target_size_kb': targetSize,
+            'image_quality': imageQuality,
+            'downsample_images': downsampleImages,
+            'max_image_dpi': maxImageDpi,
+            'remove_metadata': removeMetadata,
+            'remove_annotations': removeAnnotations,
+            'remove_bookmarks': removeBookmarks,
+            'remove_forms': removeForms,
+            'remove_javascript': removeJavaScript,
+            'grayscale': grayscale,
+            'linearize': linearize
         }
         
         PDFProcessor.compress_pdf(input_file, output_file, options)
+        
+        # Determine output filename
+        if not output_filename:
+            base_name = file.filename.rsplit('.', 1)[0] if file.filename else "document"
+            output_filename = f"{base_name}_compressed.pdf"
         
         # Calculate compression ratio
         output_size = output_file.stat().st_size

@@ -16,12 +16,14 @@ router = APIRouter(prefix="/add-page-numbers", tags=["PDF Tools"])
 async def add_page_numbers(
     file: UploadFile = File(..., description="PDF file"),
     position: str = Form("bottom-center", description="Position: bottom-center, bottom-left, bottom-right, top-center, top-left, top-right"),
-    format_style: str = Form("number", description="Format: number, page-of-total, roman"),
-    start_number: int = Form(1, description="Starting page number"),
-    font_size: int = Form(12, description="Font size (8-24)"),
-    skip_first: bool = Form(False, description="Skip first page (for cover)"),
-    prefix: str = Form("", description="Prefix before number (e.g., 'Page ')"),
-    suffix: str = Form("", description="Suffix after number"),
+    startNumber: int = Form(1, description="Starting page number"),
+    skipPages: int = Form(0, description="Number of pages to skip from start"),
+    formatStyle: str = Form("number", description="Format: number, page-of-total, roman, alpha"),
+    fontFamily: str = Form("helvetica", description="Font family: helvetica, times, courier"),
+    fontSize: int = Form(12, description="Font size (8-24)"),
+    fontColor: str = Form("black", description="Font color: black, gray, blue, red"),
+    bold: bool = Form(False, description="Bold text"),
+    italic: bool = Form(False, description="Italic text"),
     output_filename: Optional[str] = Form(None, description="Output filename")
 ):
     """
@@ -45,7 +47,34 @@ async def add_page_numbers(
         FileValidator.raise_if_invalid(is_valid, error)
         
         # Validate parameters
-        font_size = max(8, min(24, font_size))
+        font_size = max(8, min(24, fontSize))
+        
+        # Font mapping
+        font_map = {
+            "helvetica": "Helvetica",
+            "times": "Times-Roman",
+            "courier": "Courier"
+        }
+        base_font = font_map.get(fontFamily.lower(), "Helvetica")
+        
+        # Apply bold/italic
+        if bold and italic:
+            font_name = f"{base_font}-BoldOblique" if base_font == "Helvetica" else f"{base_font}-BoldItalic"
+        elif bold:
+            font_name = f"{base_font}-Bold"
+        elif italic:
+            font_name = f"{base_font}-Oblique" if base_font == "Helvetica" else f"{base_font}-Italic"
+        else:
+            font_name = base_font
+        
+        # Color mapping
+        color_map = {
+            "black": (0, 0, 0),
+            "gray": (0.5, 0.5, 0.5),
+            "blue": (0, 0, 0.8),
+            "red": (0.8, 0, 0)
+        }
+        rgb = color_map.get(fontColor.lower(), (0, 0, 0))
         
         # Read file
         content = await file.read()
@@ -75,14 +104,25 @@ async def add_page_numbers(
                     num -= val[i] * count
             return roman_num
         
+        def to_alpha(num):
+            """Convert integer to alphabetic (A, B, C...)"""
+            result = ""
+            while num > 0:
+                num -= 1
+                result = chr(65 + num % 26) + result
+                num //= 26
+            return result
+        
         def format_page_number(page_num, total):
             """Format page number based on style"""
-            if format_style == "roman":
-                return f"{prefix}{to_roman(page_num)}{suffix}"
-            elif format_style == "page-of-total":
-                return f"{prefix}{page_num} of {total}{suffix}"
+            if formatStyle == "roman":
+                return to_roman(page_num)
+            elif formatStyle == "page-of-total":
+                return f"Page {page_num}/{total}"
+            elif formatStyle == "alpha":
+                return to_alpha(page_num)
             else:
-                return f"{prefix}{page_num}{suffix}"
+                return str(page_num)
         
         def get_position_coords(page_width, page_height, text_width):
             """Get x, y coordinates for position"""
@@ -97,10 +137,10 @@ async def add_page_numbers(
             }
             return positions.get(position, positions["bottom-center"])
         
-        current_number = start_number
+        current_number = startNumber
         
         for page_idx, page in enumerate(reader.pages):
-            should_number = not (skip_first and page_idx == 0)
+            should_number = page_idx >= skipPages
             
             if should_number:
                 # Get page dimensions
@@ -108,17 +148,18 @@ async def add_page_numbers(
                 page_height = float(page.mediabox.height)
                 
                 # Format the page number
-                pages_for_total = total_pages - (1 if skip_first else 0)
+                pages_for_total = total_pages - skipPages
                 number_text = format_page_number(current_number, pages_for_total)
                 
                 # Create page number overlay
                 number_buffer = io.BytesIO()
                 c = canvas.Canvas(number_buffer, pagesize=(page_width, page_height))
-                c.setFont("Helvetica", font_size)
-                c.setFillColor(black)
+                from reportlab.lib.colors import Color
+                c.setFont(font_name, font_size)
+                c.setFillColor(Color(rgb[0], rgb[1], rgb[2]))
                 
                 # Calculate text width
-                text_width = c.stringWidth(number_text, "Helvetica", font_size)
+                text_width = c.stringWidth(number_text, font_name, font_size)
                 x, y = get_position_coords(page_width, page_height, text_width)
                 
                 c.drawString(x, y, number_text)

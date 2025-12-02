@@ -1,10 +1,18 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { 
-  FileText, Upload, Download, Loader2, CheckCircle2, AlertCircle,
-  X, Table2, Settings2, Maximize2, RotateCcw
+  FileText, Download, CheckCircle2, Table2, Maximize2, 
+  Grid3X3, BookOpen, Printer, Hash
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import ToolWorkspaceLayout, { 
+  SettingsSection, 
+  SettingsToggle, 
+  SettingsButtonGroup,
+  SettingsInput
+} from '@/components/tools/ToolWorkspaceLayout';
+import FileDropzone from '@/components/tools/FileDropzone';
 
 export default function ExcelToPDFPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -13,32 +21,28 @@ export default function ExcelToPDFPage() {
   const [result, setResult] = useState<{ url: string; name: string; size: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   
+  // Layout
   const [fitToPage, setFitToPage] = useState(true);
-  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('landscape');
+  const [pageSize, setPageSize] = useState<'a4' | 'letter' | 'legal'>('a4');
+  
+  // Sheet Options
   const [sheetRange, setSheetRange] = useState('');
+  const [gridlines, setGridlines] = useState(true);
+  const [headers, setHeaders] = useState(true);
+  
+  // Print Settings
+  const [repeatRows, setRepeatRows] = useState(false);
+  const [centerOnPage, setCenterOnPage] = useState(true);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const droppedFile = e.dataTransfer.files[0];
-    const ext = droppedFile?.name.toLowerCase();
-    if (ext?.endsWith('.xls') || ext?.endsWith('.xlsx')) {
-      setFile(droppedFile);
-      setError(null);
-    } else {
-      setError('Please upload an Excel file (.xls or .xlsx)');
-    }
-  }, []);
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
+  const handleFilesChange = (files: File[]) => {
+    const selectedFile = files[0];
     if (selectedFile) {
-      const ext = selectedFile.name.toLowerCase();
-      if (ext.endsWith('.xls') || ext.endsWith('.xlsx')) {
-        setFile(selectedFile);
-        setError(null);
-      } else {
-        setError('Please upload an Excel file (.xls or .xlsx)');
-      }
+      setFile(selectedFile);
+      setError(null);
+      setResult(null);
+    } else {
+      setFile(null);
     }
   };
 
@@ -54,6 +58,11 @@ export default function ExcelToPDFPage() {
       formData.append('file', file);
       formData.append('fitToPage', String(fitToPage));
       formData.append('orientation', orientation);
+      formData.append('pageSize', pageSize);
+      formData.append('gridlines', String(gridlines));
+      formData.append('headers', String(headers));
+      formData.append('repeatRows', String(repeatRows));
+      formData.append('centerOnPage', String(centerOnPage));
       if (sheetRange) formData.append('sheetRange', sheetRange);
 
       const progressInterval = setInterval(() => {
@@ -102,218 +111,214 @@ export default function ExcelToPDFPage() {
     return (bytes / 1048576).toFixed(2) + ' MB';
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
-      {/* Header */}
-      <div className="relative overflow-hidden border-b border-zinc-800">
-        <div className="absolute inset-0 bg-gradient-to-r from-green-600/10 via-green-500/10 to-emerald-500/10" />
-        <div className="relative max-w-5xl mx-auto px-6 py-16">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-green-600 to-green-400 shadow-lg shadow-green-500/25">
-              <Table2 className="w-8 h-8 text-white" />
-            </div>
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-500/20 text-green-400 border border-green-500/30">
-              OFFICE TOOL
-            </span>
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-3">Excel to PDF</h1>
-          <p className="text-lg text-zinc-400 max-w-2xl">
-            Convert Microsoft Excel spreadsheets to PDF format with customizable layout options.
-          </p>
+  // Settings Panel
+  const settingsPanel = (
+    <>
+      {/* Layout */}
+      <SettingsSection title="Layout" icon={<Maximize2 className="w-4 h-4" />}>
+        <SettingsToggle
+          label="Fit to page"
+          description="Scale content to fit PDF pages"
+          checked={fitToPage}
+          onChange={setFitToPage}
+        />
+        <div className="mt-3">
+          <SettingsButtonGroup
+            label="Orientation"
+            value={orientation}
+            onChange={(v) => setOrientation(v as typeof orientation)}
+            options={[
+              { value: 'portrait', label: 'Portrait' },
+              { value: 'landscape', label: 'Landscape' },
+            ]}
+          />
         </div>
-      </div>
+        <div className="mt-3">
+          <SettingsButtonGroup
+            label="Page size"
+            value={pageSize}
+            onChange={(v) => setPageSize(v as typeof pageSize)}
+            options={[
+              { value: 'a4', label: 'A4' },
+              { value: 'letter', label: 'Letter' },
+              { value: 'legal', label: 'Legal' },
+            ]}
+          />
+        </div>
+      </SettingsSection>
 
-      <main className="max-w-5xl mx-auto px-6 py-12">
-        {!result ? (
-          <div className="space-y-8">
-            {/* Upload Zone */}
-            {!file ? (
-              <div
-                onDrop={handleDrop}
-                onDragOver={(e) => e.preventDefault()}
-                className="relative border-2 border-dashed border-zinc-700 hover:border-green-500/50 rounded-2xl p-12 transition-all duration-300 bg-zinc-900/30 hover:bg-green-500/5 group"
-              >
-                <input
-                  type="file"
-                  accept=".xls,.xlsx"
-                  onChange={handleFileInput}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
+      {/* Sheet Options */}
+      <SettingsSection title="Sheet Options" icon={<Grid3X3 className="w-4 h-4" />} defaultOpen={false}>
+        <SettingsInput
+          label="Sheet range"
+          value={sheetRange}
+          onChange={setSheetRange}
+          placeholder="All sheets"
+          icon={<Hash className="w-3 h-3" />}
+        />
+        <p className="text-xs text-slate-400 dark:text-white/30 mb-3">e.g., Sheet1, Sheet3</p>
+        
+        <SettingsToggle
+          label="Show gridlines"
+          description="Print cell borders"
+          checked={gridlines}
+          onChange={setGridlines}
+        />
+        <SettingsToggle
+          label="Show headers"
+          description="Print row/column headers"
+          checked={headers}
+          onChange={setHeaders}
+        />
+      </SettingsSection>
+
+      {/* Print Settings */}
+      <SettingsSection title="Print Settings" icon={<Printer className="w-4 h-4" />} defaultOpen={false}>
+        <SettingsToggle
+          label="Repeat header rows"
+          description="Print headers on every page"
+          checked={repeatRows}
+          onChange={setRepeatRows}
+        />
+        <SettingsToggle
+          label="Center on page"
+          description="Center content horizontally"
+          checked={centerOnPage}
+          onChange={setCenterOnPage}
+        />
+      </SettingsSection>
+    </>
+  );
+
+  return (
+    <ToolWorkspaceLayout
+      toolName="Excel to PDF"
+      toolIcon={<Table2 className="w-5 h-5 text-white" />}
+      toolColor="from-green-600 to-emerald-500"
+      settingsPanel={settingsPanel}
+      actionButton={{
+        label: 'Convert to PDF',
+        onClick: handleConvert,
+        disabled: !file,
+        loading: processing,
+        loadingText: `Converting... ${progress}%`,
+        icon: <FileText className="w-5 h-5" />,
+      }}
+    >
+      {!result ? (
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* File Dropzone */}
+          <FileDropzone
+            files={file ? [file] : []}
+            onFilesChange={handleFilesChange}
+            accept=".xls,.xlsx,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            multiple={false}
+            title="Drop Excel file here"
+            description="or click to browse • XLS, XLSX files"
+            icon={<Table2 className="w-8 h-8" />}
+            accentColor="green"
+            disabled={processing}
+          />
+
+          {/* Conversion Preview */}
+          {file && (
+            <div className="p-6 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+              <div className="flex items-center justify-center gap-6">
                 <div className="text-center">
-                  <div className="inline-flex p-4 rounded-2xl bg-zinc-800/50 group-hover:bg-green-500/20 transition-colors mb-4">
-                    <Upload className="w-10 h-10 text-zinc-400 group-hover:text-green-400 transition-colors" />
+                  <div className="p-4 rounded-xl bg-green-500/20 text-green-400 inline-block mb-2">
+                    <Table2 className="w-8 h-8" />
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Drop your Excel file here</h3>
-                  <p className="text-zinc-500">or click to browse</p>
-                  <div className="mt-4 flex items-center justify-center gap-3">
-                    <span className="px-3 py-1 rounded-full text-xs bg-green-500/20 text-green-400">.XLS</span>
-                    <span className="px-3 py-1 rounded-full text-xs bg-green-500/20 text-green-400">.XLSX</span>
-                  </div>
+                  <p className="text-sm text-slate-600 dark:text-white/60">.{file.name.split('.').pop()?.toUpperCase()}</p>
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between p-5 rounded-xl bg-zinc-900/50 border border-zinc-800">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-green-500/20 text-green-400">
-                    <Table2 className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-white">{file.name}</p>
-                    <p className="text-sm text-zinc-500">{formatSize(file.size)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl text-zinc-400">→</span>
-                  <div className="p-3 rounded-xl bg-red-500/20 text-red-400">
-                    <FileText className="w-6 h-6" />
-                  </div>
-                  <span className="text-red-400 font-medium">.PDF</span>
-                  <button
-                    onClick={reset}
-                    className="ml-4 p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Options */}
-            {file && (
-              <div className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800 space-y-6">
-                <h3 className="font-semibold text-white flex items-center gap-2">
-                  <Settings2 className="w-5 h-5 text-amber-400" />
-                  Conversion Options
-                </h3>
                 
-                <label className="flex items-center gap-3 p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50 cursor-pointer hover:border-zinc-600 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={fitToPage}
-                    onChange={(e) => setFitToPage(e.target.checked)}
-                    className="w-5 h-5 rounded border-zinc-600 text-green-500 focus:ring-green-500/20"
-                  />
-                  <div>
-                    <p className="text-white font-medium flex items-center gap-2">
-                      <Maximize2 className="w-4 h-4 text-green-400" />
-                      Fit to Page
-                    </p>
-                    <p className="text-sm text-zinc-500">Scale content to fit PDF pages</p>
-                  </div>
-                </label>
-
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
-                    <RotateCcw className="w-4 h-4" />
-                    Page Orientation
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => setOrientation('portrait')}
-                      className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                        orientation === 'portrait'
-                          ? 'bg-green-500/20 border-green-500/50 text-white'
-                          : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:border-zinc-600'
-                      }`}
-                    >
-                      <div className={`w-8 h-12 border-2 rounded ${orientation === 'portrait' ? 'border-green-400' : 'border-zinc-500'}`} />
-                      <span className="font-medium">Portrait</span>
-                    </button>
-                    <button
-                      onClick={() => setOrientation('landscape')}
-                      className={`p-4 rounded-xl border flex flex-col items-center gap-2 transition-all ${
-                        orientation === 'landscape'
-                          ? 'bg-green-500/20 border-green-500/50 text-white'
-                          : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:border-zinc-600'
-                      }`}
-                    >
-                      <div className={`w-12 h-8 border-2 rounded ${orientation === 'landscape' ? 'border-green-400' : 'border-zinc-500'}`} />
-                      <span className="font-medium">Landscape</span>
-                    </button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-0.5 bg-slate-300 dark:bg-white/20" />
+                  <motion.div
+                    animate={{ x: [0, 5, 0] }}
+                    transition={{ repeat: Infinity, duration: 1.5 }}
+                    className="text-slate-400 dark:text-white/40"
+                  >
+                    →
+                  </motion.div>
+                  <div className="w-8 h-0.5 bg-slate-300 dark:bg-white/20" />
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">
-                    Sheet Range (optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={sheetRange}
-                    onChange={(e) => setSheetRange(e.target.value)}
-                    placeholder="e.g., Sheet1, Sheet3 (leave empty for all)"
-                    className="w-full px-4 py-3 rounded-xl bg-zinc-800 border border-zinc-700 text-white placeholder-zinc-500 focus:border-green-500 focus:outline-none"
-                  />
+                
+                <div className="text-center">
+                  <div className="p-4 rounded-xl bg-red-500/20 text-red-400 inline-block mb-2">
+                    <FileText className="w-8 h-8" />
+                  </div>
+                  <p className="text-sm text-white/60">.PDF</p>
                 </div>
               </div>
-            )}
+              
+              <p className="text-xs text-slate-400 dark:text-white/30 text-center mt-4">
+                {formatSize(file.size)} • {orientation} • {pageSize.toUpperCase()}
+              </p>
+            </div>
+          )}
 
+          {/* Error */}
+          <AnimatePresence>
             {error && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p>{error}</p>
-              </div>
-            )}
-
-            {file && (
-              <button
-                onClick={handleConvert}
-                disabled={processing}
-                className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-3 ${
-                  processing
-                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-green-600 to-green-400 text-white hover:shadow-lg hover:shadow-green-500/25 hover:scale-[1.02] active:scale-[0.98]'
-                }`}
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm"
               >
-                {processing ? (
-                  <>
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                    Converting... {progress}%
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-6 h-6" />
-                    Convert to PDF
-                  </>
-                )}
-              </button>
+                {error}
+              </motion.div>
             )}
+          </AnimatePresence>
 
-            {processing && (
-              <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
+          {/* Progress */}
+          {processing && (
+            <div className="space-y-2">
+              <div className="w-full h-2 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-green-600 to-emerald-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
                 />
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-center py-12 space-y-6">
-            <div className="inline-flex p-6 rounded-3xl bg-green-500/20 mb-4">
-              <CheckCircle2 className="w-16 h-16 text-green-400" />
+              <p className="text-xs text-slate-500 dark:text-white/40 text-center">Converting your spreadsheet...</p>
             </div>
-            <h2 className="text-2xl font-bold text-white">Conversion Complete!</h2>
-            <p className="text-zinc-400">{result.name} • {formatSize(result.size)}</p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-              <button
-                onClick={handleDownload}
-                className="px-8 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold hover:shadow-lg hover:shadow-green-500/25 transition-all inline-flex items-center justify-center gap-2"
-              >
-                <Download className="w-5 h-5" />
-                Download PDF
-              </button>
-              <button
-                onClick={reset}
-                className="px-8 py-4 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700 transition-colors"
-              >
-                Convert Another Spreadsheet
-              </button>
-            </div>
+          )}
+        </div>
+      ) : (
+        /* Success State */
+        <div className="max-w-lg mx-auto text-center py-12 space-y-6">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="inline-flex p-6 rounded-3xl bg-green-500/20"
+          >
+            <CheckCircle2 className="w-16 h-16 text-green-500 dark:text-green-400" />
+          </motion.div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Conversion Complete!</h2>
+            <p className="text-slate-600 dark:text-white/60">{result.name} • {formatSize(result.size)}</p>
           </div>
-        )}
-      </main>
-    </div>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+            <button
+              onClick={handleDownload}
+              className="px-8 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold 
+                hover:shadow-lg hover:shadow-green-500/25 transition-all inline-flex items-center justify-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+              Download PDF
+            </button>
+            <button
+              onClick={reset}
+              className="px-8 py-4 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-white/70 font-semibold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+            >
+              Convert Another
+            </button>
+          </div>
+        </div>
+      )}
+    </ToolWorkspaceLayout>
   );
 }

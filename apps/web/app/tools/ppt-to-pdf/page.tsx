@@ -1,17 +1,18 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { 
-  FileText, Upload, Download, Loader2, CheckCircle2, AlertCircle,
-  X, Presentation, Settings2, FileSliders, StickyNote
+  FileText, Download, CheckCircle2, Presentation, 
+  StickyNote, Layers, Minimize2, BookOpen
 } from 'lucide-react';
-
-const SLIDES_PER_PAGE = [
-  { id: '1', label: '1 Slide', desc: 'Full page slides' },
-  { id: '2', label: '2 Slides', desc: 'Half page each' },
-  { id: '4', label: '4 Slides', desc: 'Quarter page each' },
-  { id: '6', label: '6 Slides', desc: 'Handout format' },
-];
+import { motion, AnimatePresence } from 'framer-motion';
+import ToolWorkspaceLayout, { 
+  SettingsSection, 
+  SettingsToggle, 
+  SettingsSlider,
+  SettingsButtonGroup
+} from '@/components/tools/ToolWorkspaceLayout';
+import FileDropzone from '@/components/tools/FileDropzone';
 
 export default function PPTToPDFPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -20,32 +21,27 @@ export default function PPTToPDFPage() {
   const [result, setResult] = useState<{ url: string; name: string; size: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
   
+  // Layout
+  const [slidesPerPage, setSlidesPerPage] = useState<'1' | '2' | '4' | '6'>('1');
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('landscape');
+  
+  // Content
   const [includeNotes, setIncludeNotes] = useState(false);
-  const [slidesPerPage, setSlidesPerPage] = useState('1');
+  const [includeHidden, setIncludeHidden] = useState(false);
+  const [includeComments, setIncludeComments] = useState(false);
+  
+  // Quality
   const [quality, setQuality] = useState(90);
+  const [embedFonts, setEmbedFonts] = useState(true);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const droppedFile = e.dataTransfer.files[0];
-    const ext = droppedFile?.name.toLowerCase();
-    if (ext?.endsWith('.ppt') || ext?.endsWith('.pptx')) {
-      setFile(droppedFile);
-      setError(null);
-    } else {
-      setError('Please upload a PowerPoint file (.ppt or .pptx)');
-    }
-  }, []);
-
-  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = e.target.files?.[0];
+  const handleFilesChange = (files: File[]) => {
+    const selectedFile = files[0];
     if (selectedFile) {
-      const ext = selectedFile.name.toLowerCase();
-      if (ext.endsWith('.ppt') || ext.endsWith('.pptx')) {
-        setFile(selectedFile);
-        setError(null);
-      } else {
-        setError('Please upload a PowerPoint file (.ppt or .pptx)');
-      }
+      setFile(selectedFile);
+      setError(null);
+      setResult(null);
+    } else {
+      setFile(null);
     }
   };
 
@@ -59,9 +55,13 @@ export default function PPTToPDFPage() {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      formData.append('includeNotes', String(includeNotes));
       formData.append('slidesPerPage', slidesPerPage);
+      formData.append('orientation', orientation);
+      formData.append('includeNotes', String(includeNotes));
+      formData.append('includeHidden', String(includeHidden));
+      formData.append('includeComments', String(includeComments));
       formData.append('quality', String(quality));
+      formData.append('embedFonts', String(embedFonts));
 
       const progressInterval = setInterval(() => {
         setProgress(prev => Math.min(prev + 4, 90));
@@ -109,216 +109,209 @@ export default function PPTToPDFPage() {
     return (bytes / 1048576).toFixed(2) + ' MB';
   };
 
+  // Settings Panel
+  const settingsPanel = (
+    <>
+      {/* Layout */}
+      <SettingsSection title="Layout" icon={<Layers className="w-4 h-4" />}>
+        <SettingsButtonGroup
+          label="Slides per page"
+          value={slidesPerPage}
+          onChange={(v) => setSlidesPerPage(v as typeof slidesPerPage)}
+          options={[
+            { value: '1', label: '1' },
+            { value: '2', label: '2' },
+            { value: '4', label: '4' },
+            { value: '6', label: '6' },
+          ]}
+        />
+        <p className="text-xs text-slate-400 dark:text-white/30 mb-3">
+          {slidesPerPage === '1' ? 'Full page' : slidesPerPage === '2' ? 'Half page' : slidesPerPage === '4' ? 'Quarter page' : 'Handout format'}
+        </p>
+        
+        <SettingsButtonGroup
+          label="Orientation"
+          value={orientation}
+          onChange={(v) => setOrientation(v as typeof orientation)}
+          options={[
+            { value: 'portrait', label: 'Portrait' },
+            { value: 'landscape', label: 'Landscape' },
+          ]}
+        />
+      </SettingsSection>
+
+      {/* Content */}
+      <SettingsSection title="Content" icon={<BookOpen className="w-4 h-4" />} defaultOpen={false}>
+        <SettingsToggle
+          label="Include speaker notes"
+          description="Add notes below slides"
+          checked={includeNotes}
+          onChange={setIncludeNotes}
+          icon={<StickyNote className="w-3 h-3" />}
+        />
+        <SettingsToggle
+          label="Include hidden slides"
+          description="Export hidden slides too"
+          checked={includeHidden}
+          onChange={setIncludeHidden}
+        />
+        <SettingsToggle
+          label="Include comments"
+          description="Show review comments"
+          checked={includeComments}
+          onChange={setIncludeComments}
+        />
+      </SettingsSection>
+
+      {/* Quality */}
+      <SettingsSection title="Quality" icon={<Minimize2 className="w-4 h-4" />} defaultOpen={false}>
+        <SettingsSlider
+          label="Image quality"
+          value={quality}
+          onChange={setQuality}
+          min={50}
+          max={100}
+          unit="%"
+        />
+        <SettingsToggle
+          label="Embed fonts"
+          description="Include fonts in PDF"
+          checked={embedFonts}
+          onChange={setEmbedFonts}
+        />
+      </SettingsSection>
+    </>
+  );
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
-      {/* Header */}
-      <div className="relative overflow-hidden border-b border-zinc-800">
-        <div className="absolute inset-0 bg-gradient-to-r from-orange-600/10 via-orange-500/10 to-amber-500/10" />
-        <div className="relative max-w-5xl mx-auto px-6 py-16">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="p-4 rounded-2xl bg-gradient-to-br from-orange-600 to-orange-400 shadow-lg shadow-orange-500/25">
-              <Presentation className="w-8 h-8 text-white" />
-            </div>
-            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-orange-500/20 text-orange-400 border border-orange-500/30">
-              OFFICE TOOL
-            </span>
-          </div>
-          <h1 className="text-4xl font-bold text-white mb-3">PowerPoint to PDF</h1>
-          <p className="text-lg text-zinc-400 max-w-2xl">
-            Convert Microsoft PowerPoint presentations to PDF format with slide layout options.
-          </p>
-        </div>
-      </div>
+    <ToolWorkspaceLayout
+      toolName="PowerPoint to PDF"
+      toolIcon={<Presentation className="w-5 h-5 text-white" />}
+      toolColor="from-orange-600 to-amber-500"
+      settingsPanel={settingsPanel}
+      actionButton={{
+        label: 'Convert to PDF',
+        onClick: handleConvert,
+        disabled: !file,
+        loading: processing,
+        loadingText: `Converting... ${progress}%`,
+        icon: <FileText className="w-5 h-5" />,
+      }}
+    >
+      {!result ? (
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* File Dropzone */}
+          <FileDropzone
+            files={file ? [file] : []}
+            onFilesChange={handleFilesChange}
+            accept=".ppt,.pptx,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            multiple={false}
+            title="Drop PowerPoint file here"
+            description="or click to browse • PPT, PPTX files"
+            icon={<Presentation className="w-8 h-8" />}
+            accentColor="amber"
+            disabled={processing}
+          />
 
-      <main className="max-w-5xl mx-auto px-6 py-12">
-        {!result ? (
-          <div className="space-y-8">
-            {/* Upload Zone */}
-            {!file ? (
-              <div
-                onDrop={handleDrop}
-                onDragOver={(e) => e.preventDefault()}
-                className="relative border-2 border-dashed border-zinc-700 hover:border-orange-500/50 rounded-2xl p-12 transition-all duration-300 bg-zinc-900/30 hover:bg-orange-500/5 group"
-              >
-                <input
-                  type="file"
-                  accept=".ppt,.pptx"
-                  onChange={handleFileInput}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
+          {/* Conversion Preview */}
+          {file && (
+            <div className="p-6 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10">
+              <div className="flex items-center justify-center gap-6">
                 <div className="text-center">
-                  <div className="inline-flex p-4 rounded-2xl bg-zinc-800/50 group-hover:bg-orange-500/20 transition-colors mb-4">
-                    <Upload className="w-10 h-10 text-zinc-400 group-hover:text-orange-400 transition-colors" />
+                  <div className="p-4 rounded-xl bg-orange-500/20 text-orange-400 inline-block mb-2">
+                    <Presentation className="w-8 h-8" />
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">Drop your PowerPoint here</h3>
-                  <p className="text-zinc-500">or click to browse</p>
-                  <div className="mt-4 flex items-center justify-center gap-3">
-                    <span className="px-3 py-1 rounded-full text-xs bg-orange-500/20 text-orange-400">.PPT</span>
-                    <span className="px-3 py-1 rounded-full text-xs bg-orange-500/20 text-orange-400">.PPTX</span>
-                  </div>
+                  <p className="text-sm text-slate-600 dark:text-white/60">.{file.name.split('.').pop()?.toUpperCase()}</p>
                 </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between p-5 rounded-xl bg-zinc-900/50 border border-zinc-800">
-                <div className="flex items-center gap-4">
-                  <div className="p-3 rounded-xl bg-orange-500/20 text-orange-400">
-                    <Presentation className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-white">{file.name}</p>
-                    <p className="text-sm text-zinc-500">{formatSize(file.size)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl text-zinc-400">→</span>
-                  <div className="p-3 rounded-xl bg-red-500/20 text-red-400">
-                    <FileText className="w-6 h-6" />
-                  </div>
-                  <span className="text-red-400 font-medium">.PDF</span>
-                  <button
-                    onClick={reset}
-                    className="ml-4 p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-0.5 bg-slate-300 dark:bg-white/20" />
+                  <motion.div
+                    animate={{ x: [0, 5, 0] }}
+                    transition={{ repeat: Infinity, duration: 1.5 }}
+                    className="text-slate-400 dark:text-white/40"
                   >
-                    <X className="w-5 h-5" />
-                  </button>
+                    →
+                  </motion.div>
+                  <div className="w-8 h-0.5 bg-slate-300 dark:bg-white/20" />
+                </div>
+                
+                <div className="text-center">
+                  <div className="p-4 rounded-xl bg-red-500/20 text-red-400 inline-block mb-2">
+                    <FileText className="w-8 h-8" />
+                  </div>
+                  <p className="text-sm text-white/60">.PDF</p>
                 </div>
               </div>
-            )}
+              
+              <p className="text-xs text-slate-400 dark:text-white/30 text-center mt-4">
+                {formatSize(file.size)} • {slidesPerPage} slide{slidesPerPage !== '1' ? 's' : ''} per page • {orientation}
+              </p>
+            </div>
+          )}
 
-            {/* Options */}
-            {file && (
-              <div className="p-6 rounded-2xl bg-zinc-900/50 border border-zinc-800 space-y-6">
-                <h3 className="font-semibold text-white flex items-center gap-2">
-                  <Settings2 className="w-5 h-5 text-amber-400" />
-                  Conversion Options
-                </h3>
-
-                {/* Slides Per Page */}
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-3 flex items-center gap-2">
-                    <FileSliders className="w-4 h-4" />
-                    Slides Per Page
-                  </label>
-                  <div className="grid grid-cols-4 gap-3">
-                    {SLIDES_PER_PAGE.map(option => (
-                      <button
-                        key={option.id}
-                        onClick={() => setSlidesPerPage(option.id)}
-                        className={`p-4 rounded-xl border text-center transition-all ${
-                          slidesPerPage === option.id
-                            ? 'bg-orange-500/20 border-orange-500/50 text-white'
-                            : 'bg-zinc-800/50 border-zinc-700/50 text-zinc-400 hover:border-zinc-600'
-                        }`}
-                      >
-                        <p className="font-semibold">{option.label}</p>
-                        <p className="text-xs opacity-70 mt-1">{option.desc}</p>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <label className="flex items-center gap-3 p-4 rounded-xl bg-zinc-800/50 border border-zinc-700/50 cursor-pointer hover:border-zinc-600 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={includeNotes}
-                    onChange={(e) => setIncludeNotes(e.target.checked)}
-                    className="w-5 h-5 rounded border-zinc-600 text-orange-500 focus:ring-orange-500/20"
-                  />
-                  <div>
-                    <p className="text-white font-medium flex items-center gap-2">
-                      <StickyNote className="w-4 h-4 text-orange-400" />
-                      Include Speaker Notes
-                    </p>
-                    <p className="text-sm text-zinc-500">Add presentation notes below slides</p>
-                  </div>
-                </label>
-
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-3">
-                    Quality: {quality}%
-                  </label>
-                  <input
-                    type="range"
-                    min={50}
-                    max={100}
-                    value={quality}
-                    onChange={(e) => setQuality(parseInt(e.target.value))}
-                    className="w-full accent-orange-500"
-                  />
-                  <div className="flex justify-between text-xs text-zinc-500 mt-1">
-                    <span>Smaller file</span>
-                    <span>Higher quality</span>
-                  </div>
-                </div>
-              </div>
-            )}
-
+          {/* Error */}
+          <AnimatePresence>
             {error && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3 text-red-400">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                <p>{error}</p>
-              </div>
-            )}
-
-            {file && (
-              <button
-                onClick={handleConvert}
-                disabled={processing}
-                className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all flex items-center justify-center gap-3 ${
-                  processing
-                    ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
-                    : 'bg-gradient-to-r from-orange-600 to-orange-400 text-white hover:shadow-lg hover:shadow-orange-500/25 hover:scale-[1.02] active:scale-[0.98]'
-                }`}
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-sm"
               >
-                {processing ? (
-                  <>
-                    <Loader2 className="w-6 h-6 animate-spin" />
-                    Converting... {progress}%
-                  </>
-                ) : (
-                  <>
-                    <FileText className="w-6 h-6" />
-                    Convert to PDF
-                  </>
-                )}
-              </button>
+                {error}
+              </motion.div>
             )}
+          </AnimatePresence>
 
-            {processing && (
-              <div className="w-full h-2 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-orange-600 to-orange-400 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
+          {/* Progress */}
+          {processing && (
+            <div className="space-y-2">
+              <div className="w-full h-2 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-orange-600 to-amber-500"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
                 />
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="text-center py-12 space-y-6">
-            <div className="inline-flex p-6 rounded-3xl bg-green-500/20 mb-4">
-              <CheckCircle2 className="w-16 h-16 text-green-400" />
+              <p className="text-xs text-slate-500 dark:text-white/40 text-center">Converting your presentation...</p>
             </div>
-            <h2 className="text-2xl font-bold text-white">Conversion Complete!</h2>
-            <p className="text-zinc-400">{result.name} • {formatSize(result.size)}</p>
-            
-            <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
-              <button
-                onClick={handleDownload}
-                className="px-8 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold hover:shadow-lg hover:shadow-green-500/25 transition-all inline-flex items-center justify-center gap-2"
-              >
-                <Download className="w-5 h-5" />
-                Download PDF
-              </button>
-              <button
-                onClick={reset}
-                className="px-8 py-4 rounded-xl bg-zinc-800 text-zinc-300 font-semibold hover:bg-zinc-700 transition-colors"
-              >
-                Convert Another Presentation
-              </button>
-            </div>
+          )}
+        </div>
+      ) : (
+        /* Success State */
+        <div className="max-w-lg mx-auto text-center py-12 space-y-6">
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="inline-flex p-6 rounded-3xl bg-green-500/20"
+          >
+            <CheckCircle2 className="w-16 h-16 text-green-500 dark:text-green-400" />
+          </motion.div>
+          
+          <div>
+            <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Conversion Complete!</h2>
+            <p className="text-slate-600 dark:text-white/60">{result.name} • {formatSize(result.size)}</p>
           </div>
-        )}
-      </main>
-    </div>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
+            <button
+              onClick={handleDownload}
+              className="px-8 py-4 rounded-xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-semibold 
+                hover:shadow-lg hover:shadow-green-500/25 transition-all inline-flex items-center justify-center gap-2"
+            >
+              <Download className="w-5 h-5" />
+              Download PDF
+            </button>
+            <button
+              onClick={reset}
+              className="px-8 py-4 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-white/70 font-semibold hover:bg-slate-200 dark:hover:bg-white/10 transition-colors"
+            >
+              Convert Another
+            </button>
+          </div>
+        </div>
+      )}
+    </ToolWorkspaceLayout>
   );
 }

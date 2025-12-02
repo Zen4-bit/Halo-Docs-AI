@@ -1,16 +1,30 @@
-# Cloud Build configuration for HALO AI Backend
+# Cloud Build configuration for HALO Docs AI Backend
 # Builds and deploys FastAPI backend to Cloud Run
 
 steps:
   # Build the backend container image
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-f', 'cloud-run/Dockerfile.backend', '-t', 'gcr.io/$PROJECT_ID/halo-ai-backend:$BUILD_ID', '.']
+    args:
+      - 'build'
+      - '-f'
+      - 'cloud-run/Dockerfile.backend'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/halo-docs-ai-backend:$BUILD_ID'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/halo-docs-ai-backend:latest'
+      - '.'
     id: 'build-backend'
+    timeout: '1200s'
 
-  # Push the container image to Artifact Registry
+  # Push the container images
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', 'gcr.io/$PROJECT_ID/halo-ai-backend:$BUILD_ID']
-    id: 'push-backend'
+    args: ['push', 'gcr.io/$PROJECT_ID/halo-docs-ai-backend:$BUILD_ID']
+    id: 'push-backend-versioned'
+    waitFor: ['build-backend']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/halo-docs-ai-backend:latest']
+    id: 'push-backend-latest'
     waitFor: ['build-backend']
 
   # Deploy to Cloud Run
@@ -18,28 +32,28 @@ steps:
     args:
       - 'run'
       - 'deploy'
-      - 'halo-ai-backend'
-      - '--image=gcr.io/$PROJECT_ID/halo-ai-backend:$BUILD_ID'
-      - '--region=us-central1'
+      - 'halo-docs-ai-backend'
+      - '--image=gcr.io/$PROJECT_ID/halo-docs-ai-backend:$BUILD_ID'
+      - '--region=${_REGION}'
       - '--platform=managed'
       - '--allow-unauthenticated'
-      - '--memory=2Gi'
-      - '--cpu=1'
+      - '--memory=4Gi'
+      - '--cpu=2'
       - '--timeout=300s'
       - '--min-instances=0'
       - '--max-instances=10'
-      - '--set-env-vars=VERTEX_AI_PROJECT_ID=$PROJECT_ID'
-      - '--set-env-vars=VERTEX_AI_LOCATION=us-central1'
-      - '--set-env-vars=PYTHON_ENV=production'
+      - '--concurrency=80'
+      - '--set-env-vars=PYTHON_ENV=production,CORS_ORIGINS=*,USE_LOCAL_STORAGE=true,LOCAL_STORAGE_PATH=/app/uploads,MAX_UPLOAD_SIZE=209715200'
     id: 'deploy-backend'
-    waitFor: ['push-backend']
+    waitFor: ['push-backend-versioned', 'push-backend-latest']
 
-# Store the backend URL for frontend deployment
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
   diskSizeGb: 100
 
 substitutions:
-  _REGION: 'us-central1'
+  _REGION: 'us-west1'
 
-tags: ['halo-ai-backend']
+tags: ['halo-docs-ai', 'backend']
+timeout: '1800s'

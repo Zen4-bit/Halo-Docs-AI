@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { proxyFormData } from '@/lib/bff-helper';
+import { TOOL_ENDPOINTS } from '@/lib/tool-endpoints';
 
 export async function POST(request: NextRequest) {
-  return proxyFormData(request, '/api/tools/ppt-to-pdf');
+  return proxyFormData(request, TOOL_ENDPOINTS.PPT_TO_PDF);
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { 
   Lightbulb, Loader2, Copy, Check, Upload, X, FileText, Image,
   Settings2, ChevronDown, Download, Heart, Users, Tag, Target,
@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AIResponseRenderer from '@/components/ai/AIResponseRenderer';
+import { useAIHistory } from '@/context/AIHistoryContext';
 
 const PROFILES = [
   { id: 'general', label: 'General', icon: '🔍', description: 'Overall analysis' },
@@ -49,6 +50,46 @@ export default function InsightsPage() {
   const [extractActionable, setExtractActionable] = useState(true);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Shared history context
+  const { updateCurrentSession, selectedItemData, isNewChat } = useAIHistory();
+  
+  // Restore session when a history item is selected
+  useEffect(() => {
+    if (selectedItemData) {
+      try {
+        if (selectedItemData.text) setText(selectedItemData.text);
+        if (selectedItemData.profile) setProfile(selectedItemData.profile);
+        if (selectedItemData.insights) setInsights(selectedItemData.insights);
+      } catch (error) {
+        console.error('Error restoring insights session:', error);
+      }
+    }
+  }, [selectedItemData]);
+  
+  // Handle new chat action
+  useEffect(() => {
+    if (isNewChat) {
+      setText('');
+      setProfile('general');
+      setInsights(null);
+      setError('');
+      setAttachedFile(null);
+      setFilePreview(null);
+    }
+  }, [isNewChat]);
+  
+  // Save to history when insights are complete
+  useEffect(() => {
+    if (insights && !loading) {
+      const insightsStr = typeof insights === 'string' ? insights : JSON.stringify(insights);
+      updateCurrentSession(
+        text.slice(0, 50) + (text.length > 50 ? '...' : ''),
+        { text, profile, insights },
+        insightsStr.slice(0, 100)
+      );
+    }
+  }, [insights, loading, updateCurrentSession]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -135,25 +176,11 @@ export default function InsightsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
-      {/* Header */}
-      <div className="border-b border-zinc-800 bg-zinc-900/50 backdrop-blur-xl">
-        <div className="max-w-5xl mx-auto px-6 py-6">
-          <div className="flex items-center gap-4">
-            <div className="p-3 rounded-2xl bg-gradient-to-br from-yellow-500 to-orange-500 shadow-lg shadow-yellow-500/25">
-              <Lightbulb className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-white">AI Insights</h1>
-              <p className="text-zinc-400">Comprehensive content analysis with sentiment, entities & actionable insights</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <main className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+    <div className="flex flex-col h-full pt-12 md:pt-0">
+      <main className="flex-1 overflow-y-auto min-h-0">
+        <div className="max-w-[850px] mx-auto px-3 sm:px-4 py-4 space-y-4">
         {/* Upload Zone */}
-        <div onClick={() => fileInputRef.current?.click()} className="relative border-2 border-dashed border-zinc-700 hover:border-yellow-500/50 rounded-2xl p-6 transition-all cursor-pointer bg-zinc-900/30 hover:bg-yellow-500/5 group">
+        <div onClick={() => fileInputRef.current?.click()} className="tool-upload-zone cursor-pointer hover:border-yellow-500/50 hover:bg-yellow-500/5 group">
           <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.txt,image/*" onChange={handleFileSelect} className="hidden" />
           
           {attachedFile ? (
@@ -161,22 +188,22 @@ export default function InsightsPage() {
               {filePreview ? (
                 <img src={filePreview} alt="Preview" className="w-16 h-16 rounded-xl object-cover" />
               ) : (
-                <div className="w-16 h-16 rounded-xl bg-zinc-800 flex items-center justify-center">
+                <div className="w-16 h-16 rounded-xl tool-bg-highlight flex items-center justify-center">
                   <FileText className="w-8 h-8 text-yellow-400" />
                 </div>
               )}
               <div className="flex-1">
-                <p className="text-white font-medium">{attachedFile.name}</p>
-                <p className="text-sm text-zinc-400">{(attachedFile.size / 1024).toFixed(1)} KB</p>
+                <p className="tool-text font-medium">{attachedFile.name}</p>
+                <p className="text-sm tool-text-secondary">{(attachedFile.size / 1024).toFixed(1)} KB</p>
               </div>
-              <button onClick={(e) => { e.stopPropagation(); removeFile(); }} className="p-2 rounded-lg hover:bg-zinc-700 text-zinc-400 hover:text-red-400">
+              <button onClick={(e) => { e.stopPropagation(); removeFile(); }} className="p-2 rounded-lg hover:tool-bg-highlight tool-text-muted hover:text-red-400">
                 <X className="w-5 h-5" />
               </button>
             </div>
           ) : (
             <div className="text-center">
-              <Upload className="w-10 h-10 text-zinc-500 group-hover:text-yellow-400 mx-auto mb-2 transition-colors" />
-              <p className="text-white font-medium">Upload document or image for analysis</p>
+              <Upload className="w-10 h-10 tool-text-muted group-hover:text-yellow-400 mx-auto mb-2 transition-colors" />
+              <p className="tool-text font-medium">Upload document or image for analysis</p>
               <p className="text-sm text-zinc-500">PDF, DOCX, TXT, or images</p>
             </div>
           )}
@@ -252,15 +279,6 @@ export default function InsightsPage() {
 
         {/* Error */}
         {error && <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center gap-2"><AlertCircle className="w-5 h-5" />{error}</div>}
-
-        {/* Analyze Button */}
-        <button
-          onClick={handleAnalyze}
-          disabled={loading || (!text.trim() && !attachedFile)}
-          className="w-full py-4 px-6 rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-semibold hover:shadow-lg hover:shadow-yellow-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all"
-        >
-          {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Analyzing...</> : <><TrendingUp className="w-5 h-5" />Generate Insights</>}
-        </button>
 
         {/* Results */}
         {insights && (
@@ -361,7 +379,21 @@ export default function InsightsPage() {
             )}
           </div>
         )}
+        </div>
       </main>
+
+      {/* Analyze Button - Fixed at bottom */}
+      <div className="flex-shrink-0 border-t border-border bg-surface/95 backdrop-blur-xl">
+        <div className="max-w-[850px] mx-auto px-4 py-2">
+          <button
+            onClick={handleAnalyze}
+            disabled={loading || (!text.trim() && !attachedFile)}
+            className="w-full py-3 px-6 rounded-xl bg-gradient-to-r from-yellow-500 to-orange-500 text-white font-semibold hover:shadow-lg hover:shadow-yellow-500/25 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 transition-all"
+          >
+            {loading ? <><Loader2 className="w-5 h-5 animate-spin" />Analyzing...</> : <><TrendingUp className="w-5 h-5" />Generate Insights</>}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
